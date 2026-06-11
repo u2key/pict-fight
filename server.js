@@ -233,6 +233,10 @@ function updatePlayer(id) {
     p.x += p.vx;
     p.y += p.vy;
 
+    // Resolve platform collisions to prevent phasing through the stage floor
+    p.grounded = false;
+    resolveCollisions(p, inputs);
+
     // Check boundaries/KO
     checkKO(p);
 
@@ -537,7 +541,9 @@ function resolveCollisions(p, inputs) {
   }
 
   // 2. Semi-Solid Platforms Collision (pass-through platforms)
-  if (p.vy >= 0 && !inputs.down) {
+  // Disable dropping down via down key during hitstun or shieldstun
+  const canDrop = inputs.down && p.hitStun === 0 && p.shieldStun === 0;
+  if (p.vy >= 0 && !canDrop) {
     for (const plat of STAGE.platforms) {
       const px1 = p.x - p.width / 2;
       const px2 = p.x + p.width / 2;
