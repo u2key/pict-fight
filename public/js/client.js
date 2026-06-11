@@ -349,7 +349,8 @@ const keys = {
   KeyA: false, KeyD: false, KeyW: false, KeyS: false,
   KeyZ: false, KeyJ: false,
   KeyX: false, KeyK: false,
-  KeyC: false, KeyL: false
+  KeyC: false, KeyL: false,
+  KeyH: false
 };
 
 let lastSentInputsJson = '';
@@ -383,7 +384,9 @@ function setupInputListeners() {
   window.addEventListener('keydown', (e) => {
     if (e.code in keys) {
       keys[e.code] = true;
-      sendInputsToServer();
+      if (e.code !== 'KeyH') {
+        sendInputsToServer();
+      }
       
       // Prevent browser scrolling with arrow keys/space
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) {
@@ -395,7 +398,9 @@ function setupInputListeners() {
   window.addEventListener('keyup', (e) => {
     if (e.code in keys) {
       keys[e.code] = false;
-      sendInputsToServer();
+      if (e.code !== 'KeyH') {
+        sendInputsToServer();
+      }
     }
   });
 }
@@ -768,7 +773,7 @@ function drawPictogram(ctx, p) {
     ctx.stroke();
   }
 
-  // Draw eye dot looking forward (scales with body flip)
+  // Draw eye / visor looking forward (scales with body flip)
   ctx.strokeStyle = p.color;
   ctx.fillStyle = p.color;
   ctx.lineWidth = 1.5;
@@ -780,10 +785,35 @@ function drawPictogram(ctx, p) {
     ctx.moveTo(4, -47); ctx.lineTo(1, -44);
     ctx.stroke();
   } else {
-    // Normal circle eye
+    // Sleek glowing visor pointing forward (indicates orientation clearly)
     ctx.beginPath();
-    ctx.arc(3, -46, 1.2, 0, Math.PI * 2);
+    ctx.moveTo(3, -47);
+    ctx.lineTo(8, -45);
+    ctx.lineTo(3, -43);
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 4;
+    ctx.shadowColor = p.color;
     ctx.fill();
+  }
+
+  // Draw directional arrow indicator under feet (if not dazed/respawning)
+  if (p.hitStun === 0 && p.shieldStun === 0 && !p.isShielding) {
+    ctx.save();
+    ctx.strokeStyle = p.color;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.7;
+    ctx.shadowBlur = 6;
+    ctx.shadowColor = p.color;
+    
+    // Draw chevron arrow pointing forward
+    ctx.beginPath();
+    ctx.moveTo(4, 5);
+    ctx.lineTo(16, 5);
+    ctx.lineTo(12, 1);
+    ctx.moveTo(16, 5);
+    ctx.lineTo(12, 9);
+    ctx.stroke();
+    ctx.restore();
   }
 
   ctx.restore();
@@ -940,6 +970,11 @@ function render() {
   updateAnnouncements();
   drawAnnouncements(ctx);
 
+  // Draw Help Overlay if holding H key
+  if (keys.KeyH) {
+    drawHelpOverlay(ctx);
+  }
+
   ctx.restore();
 
   // Queue next frame
@@ -961,3 +996,115 @@ setInterval(() => {
     pingText.textContent = `Ping: ${Math.round(20 + Math.random() * 10)} ms`;
   }
 }, 2000);
+
+// Draw Help Overlay card on top of the Arena
+function drawHelpOverlay(ctx) {
+  ctx.save();
+  
+  // Darken background with 65% opacity
+  ctx.fillStyle = 'rgba(11, 15, 25, 0.65)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  // Center Card Dimensions
+  const w = 620;
+  const h = 480;
+  const x = (canvas.width - w) / 2;
+  const y = (canvas.height - h) / 2;
+  
+  // Draw glowing card container (glassmorphism style)
+  ctx.save();
+  ctx.shadowBlur = 25;
+  ctx.shadowColor = '#06b6d4'; // Cyan glow
+  ctx.fillStyle = 'rgba(17, 24, 39, 0.9)';
+  ctx.strokeStyle = 'rgba(6, 182, 212, 0.5)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 16);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // Header Title
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '800 24px Outfit';
+  ctx.textAlign = 'center';
+  ctx.fillText('COMBAT PROTOCOL & MANUAL', canvas.width / 2, y + 45);
+  
+  // Subtitle/Separator line
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(x + 40, y + 65);
+  ctx.lineTo(x + w - 40, y + 65);
+  ctx.stroke();
+
+  // Controls Layout List
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  
+  const controls = [
+    { keys: '← / →  or  A / D', action: 'Move Left / Right' },
+    { keys: '↑  or  W', action: 'Jump / Double Jump (2 Max)' },
+    { keys: '↓  or  S', action: 'Drop Down / Pass Platforms' },
+    { keys: 'Z  or  J', action: 'Normal Strike (Quick Attack)' },
+    { keys: 'X  or  K', action: 'Max Charge Strike (Hold & Release)' },
+    { keys: 'C  or  L', action: 'Shield / Guard (Absorbs knockback)' },
+    { keys: 'H (Hold)', action: 'Show Help Overlay (Current view)' }
+  ];
+
+  let startY = y + 95;
+  const rowHeight = 36;
+  
+  controls.forEach((ctrl, i) => {
+    const cy = startY + i * rowHeight;
+    
+    // Draw keycap background box
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x + 40, cy - 12, 175, 24, 6);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw Key texts inside keycap box
+    ctx.fillStyle = '#67e8f9'; // Cyan bright
+    ctx.font = 'bold 12px Courier New, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(ctrl.keys, x + 40 + 175/2, cy);
+    
+    // Draw Action label
+    ctx.fillStyle = '#e5e7eb'; // Light gray
+    ctx.font = '500 14px Outfit';
+    ctx.textAlign = 'left';
+    ctx.fillText(ctrl.action, x + 235, cy);
+  });
+
+  // System Mechanics Info at the bottom
+  const mechY = y + 365;
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+  ctx.beginPath();
+  ctx.moveTo(x + 40, mechY - 15);
+  ctx.lineTo(x + w - 40, mechY - 15);
+  ctx.stroke();
+
+  ctx.fillStyle = '#9ca3af'; // Gray heading
+  ctx.font = 'bold 11px Outfit';
+  ctx.fillText('CORE SYSTEM MECHANICS', x + 45, mechY);
+
+  ctx.fillStyle = '#f97316'; // Orange
+  ctx.font = 'bold 12px Outfit';
+  ctx.fillText('Damage Rate:', x + 45, mechY + 24);
+  ctx.fillStyle = '#d1d5db';
+  ctx.font = '400 12px Outfit';
+  ctx.fillText('Starts at 0%. As damage rises, you fly further when struck!', x + 140, mechY + 24);
+
+  ctx.fillStyle = '#06b6d4'; // Cyan
+  ctx.font = 'bold 12px Outfit';
+  ctx.fillText('Blast Zone:', x + 45, mechY + 46);
+  ctx.fillStyle = '#d1d5db';
+  ctx.font = '400 12px Outfit';
+  ctx.fillText('Getting knocked beyond the screen bounds results in a KO.', x + 140, mechY + 46);
+
+  ctx.restore();
+}
