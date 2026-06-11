@@ -153,6 +153,20 @@ function playSynthSound(type) {
       osc2.stop(now + 0.6);
       break;
     }
+    case 'laser': {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.15);
+      break;
+    }
     case 'join': {
       const freqs = [261.63, 329.63, 392.00, 523.25]; // C Major
       freqs.forEach((f, idx) => {
@@ -462,6 +476,15 @@ function handleServerEvent(evt) {
       break;
     case 'attack_swing':
       addSlash(evt.x, evt.y, evt.facing, evt.attackType, evt.chargeRatio);
+      // Play retro laser pew sound if attacker is a blaster
+      const swinger = currentGameState.players.find(p => p.id === evt.id);
+      if (swinger && swinger.characterType === 'blaster') {
+        playSynthSound('laser');
+      }
+      break;
+    case 'proj_explode':
+      playSynthSound('shield_hit'); // light chime for bullet detonation
+      spawnParticles(evt.x, evt.y, 8, evt.color, 0.8, 12);
       break;
     case 'shield_hit':
       playSynthSound('shield_hit');
@@ -539,9 +562,11 @@ function updateHUD() {
       ? '<span style="color: #ef4444; font-size: 1.1rem; font-weight: 800; letter-spacing: 1px;">DEFEATED</span>'
       : `${p.damageRate.toFixed(1)}%`;
 
+    const typeName = p.characterType === 'striker' ? 'Striker' : 'Blaster';
+
     html += `
       <div class="player-hud-card ${cardClass}" style="--accent-color: ${p.color}; opacity: ${p.isEliminated ? 0.45 : 1.0}">
-        <div class="hud-name">${p.name} ${isMe ? '(You)' : ''}</div>
+        <div class="hud-name">${p.name} (${typeName}) ${isMe ? '(You)' : ''}</div>
         <div class="hud-damage ${heavyClass}" style="color: ${dmgColor}">${damageDisplay}</div>
         <div class="hud-stocks">
           ${stockDots}
@@ -713,15 +738,34 @@ function drawPictogram(ctx, p) {
     ctx.lineTo(6, -4);
     ctx.stroke();
 
-    // Arms floating up
+    // Left arm floating up
     ctx.beginPath();
     ctx.moveTo(0, -34);
     ctx.lineTo(-10, -42);
     ctx.lineTo(-12, -48);
-    ctx.moveTo(0, -34);
-    ctx.lineTo(10, -42);
-    ctx.lineTo(12, -48);
     ctx.stroke();
+
+    // Right arm
+    if (p.characterType === 'blaster') {
+      // Points blaster forward/downward in air
+      ctx.beginPath();
+      ctx.moveTo(0, -34);
+      ctx.lineTo(14, -25);
+      ctx.stroke();
+      
+      ctx.save();
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.roundRect(12, -28, 8, 5, 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(0, -34);
+      ctx.lineTo(10, -42);
+      ctx.lineTo(12, -48);
+      ctx.stroke();
+    }
   } else if (Math.abs(p.vx) > 0.3) {
     // Walking leg cycle swing
     const walkCycle = Math.sin(Date.now() * 0.15 * Math.abs(p.vx)) * 10;
@@ -753,11 +797,27 @@ function drawPictogram(ctx, p) {
     ctx.stroke();
 
     // Right arm
-    ctx.beginPath();
-    ctx.moveTo(1, -33);
-    ctx.lineTo(6 - walkCycle * 0.5, -27);
-    ctx.lineTo(10 - walkCycle, -20);
-    ctx.stroke();
+    if (p.characterType === 'blaster') {
+      // Holds blaster forward while running!
+      ctx.beginPath();
+      ctx.moveTo(1, -33);
+      ctx.lineTo(14, -28);
+      ctx.stroke();
+      
+      // Draw blaster barrel
+      ctx.save();
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.roundRect(12, -31, 8, 5, 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(1, -33);
+      ctx.lineTo(6 - walkCycle * 0.5, -27);
+      ctx.lineTo(10 - walkCycle, -20);
+      ctx.stroke();
+    }
   } else {
     // Standard Idle Pose
     ctx.beginPath();
@@ -769,15 +829,34 @@ function drawPictogram(ctx, p) {
     ctx.lineTo(6, 0);
     ctx.stroke();
 
-    // Arms down
+    // Left arm down
     ctx.beginPath();
     ctx.moveTo(0, -35);
     ctx.lineTo(-7, -25);
     ctx.lineTo(-8, -15);
-    ctx.moveTo(0, -35);
-    ctx.lineTo(7, -25);
-    ctx.lineTo(8, -15);
     ctx.stroke();
+
+    // Right arm down
+    if (p.characterType === 'blaster') {
+      // Hold blaster forward!
+      ctx.beginPath();
+      ctx.moveTo(0, -35);
+      ctx.lineTo(14, -30);
+      ctx.stroke();
+      
+      ctx.save();
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.roundRect(12, -33, 8, 5, 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(0, -35);
+      ctx.lineTo(7, -25);
+      ctx.lineTo(8, -15);
+      ctx.stroke();
+    }
   }
 
   // Draw eye / visor looking forward (scales with body flip)
@@ -962,6 +1041,20 @@ function render() {
 
   updateSlashes();
   drawSlashes(ctx);
+
+  // 4.5 Draw active projectiles
+  if (currentGameState.projectiles) {
+    currentGameState.projectiles.forEach(proj => {
+      ctx.save();
+      ctx.fillStyle = proj.color;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = proj.color;
+      ctx.beginPath();
+      ctx.arc(proj.x, proj.y, proj.size / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    });
+  }
 
   // 5. Draw players
   currentGameState.players.forEach(p => {

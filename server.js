@@ -56,6 +56,8 @@ let events = [];         // List of game events that happened in the current tic
 let matchState = 'playing'; // 'playing' or 'ended'
 let matchEndTimer = 0;      // Ticks remaining in the match end screen
 let matchWinner = null;     // Winner details
+let projectiles = [];       // Active projectiles list
+let nextProjId = 0;         // ID index for projectiles
 
 // Helper to get a random spawn point
 function getRandomSpawnPoint() {
@@ -67,11 +69,13 @@ function createPlayer(id, name) {
   const spawn = getRandomSpawnPoint();
   const color = COLORS[colorIndex % COLORS.length];
   colorIndex++;
+  const characterType = Math.random() < 0.5 ? 'striker' : 'blaster';
 
   return {
     id,
     name: name || `Player ${colorIndex}`,
     color,
+    characterType, // 'striker' or 'blaster'
     x: spawn.x,
     y: spawn.y,
     prevX: spawn.x,
@@ -393,6 +397,44 @@ function updatePlayer(id) {
 
 // Perform attack hitbox checks
 function performAttack(attacker, type, chargeRatio) {
+  if (attacker.characterType === 'blaster') {
+    // Blaster Character: Spawn Projectile instead of Melee check
+    const size = type === 'strong' ? (12 + chargeRatio * 18) : 10;
+    const speed = type === 'strong' ? (10 - chargeRatio * 4) : 12;
+    const dmg = type === 'strong' ? (8 + chargeRatio * 8) : 4.5;
+    const baseKb = type === 'strong' ? (3.5 + chargeRatio * 3.5) : 1.8;
+    const scaleKb = type === 'strong' ? (0.08 + chargeRatio * 0.04) : 0.03;
+
+    // Broadcast attack swing event for visual client effects
+    events.push({
+      type: 'attack_swing',
+      id: attacker.id,
+      attackType: type,
+      chargeRatio,
+      facing: attacker.facing,
+      x: attacker.x,
+      y: attacker.y - attacker.height / 2
+    });
+
+    const proj = {
+      id: 'proj_' + nextProjId++,
+      ownerId: attacker.id,
+      x: attacker.x + attacker.facing * 25,
+      y: attacker.y - attacker.height / 2,
+      vx: attacker.facing * speed,
+      vy: 0,
+      size: size,
+      damage: dmg,
+      baseKb: baseKb,
+      scaleKb: scaleKb,
+      color: attacker.color,
+      life: type === 'strong' ? 120 : 90
+    };
+    projectiles.push(proj);
+    return;
+  }
+
+  // Striker Character: Perform normal Melee check
   const aw = type === 'strong' ? 70 : 55;
   const ah = 40;
   const ox = attacker.facing * (type === 'strong' ? 40 : 30);
@@ -653,10 +695,12 @@ function checkMatchEnd() {
 function restartMatch() {
   matchState = 'playing';
   matchWinner = null;
+  projectiles = []; // Clear active projectiles
 
   for (const id in players) {
     const p = players[id];
     const spawn = getRandomSpawnPoint();
+    p.characterType = Math.random() < 0.5 ? 'striker' : 'blaster'; // Re-roll character class
     p.x = spawn.x;
     p.y = spawn.y;
     p.vx = 0;
@@ -680,6 +724,120 @@ function restartMatch() {
   console.log('Match restarted.');
 }
 
+// Update all active projectiles
+function updateProjectiles() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const proj = projectiles[i];
+    proj.x += proj.vx;
+    proj.y += proj.vy;
+    proj.life--;
+
+    let destroyed = false;
+
+    // 1. Check out of bounds (blast zones)
+    const b = STAGE.blastZones;
+    if (proj.x < b.left || proj.x > b.right || proj.y < b.top || proj.y > b.bottom || proj.life <= 0) {
+      destroyed = true;
+    }
+
+    // 2. Check collision with solid main platform
+    if (!destroyed) {
+      const rx1 = STAGE.mainPlatform.x1;
+      const rx2 = STAGE.mainPlatform.x2;
+      const ry1 = STAGE.mainPlatform.y1;
+      const ry2 = STAGE.mainPlatform.y2;
+      
+      const px = proj.x;
+      const py = proj.y;
+      const r = proj.size / 2;
+      
+      if (px + r > rx1 && px - r < rx2 && py + r > ry1 && py - r < ry2) {
+        destroyed = true;
+        events.push({ type: 'proj_explode', x: proj.x, y: proj.y, color: proj.color });
+      }
+    }
+
+    // 3. Check collision with other players
+    if (!destroyed) {
+      for (const id in players) {
+        if (id === proj.ownerId) continue;
+        const target = players[id];
+
+        if (target.respawnTimer > 0 || target.invulnerableTimer > 0 || target.isEliminated) continue;
+
+        const tx1 = target.x - target.width / 2;
+        const tx2 = target.x + target.width / 2;
+        const ty1 = target.y - target.height;
+        const ty2 = target.y;
+
+        const px = proj.x;
+        const py = proj.y;
+        const r = proj.size / 2;
+
+        const overlap = px + r > tx1 && px - r < tx2 && py + r > ty1 && py - r < ty2;
+        if (overlap) {
+          destroyed = true;
+
+          if (target.isShielding) {
+            const shieldDmg = proj.damage * 1.5;
+            target.shieldHealth -= shieldDmg;
+
+            const dirX = Math.sign(proj.vx) || 1;
+            target.vx = dirX * 1.8;
+            target.vy = -0.5;
+            target.grounded = false;
+
+            events.push({
+              type: 'shield_hit',
+              targetId: target.id,
+              x: proj.x,
+              y: proj.y
+            });
+
+            if (target.shieldHealth <= 0) {
+              target.shieldHealth = 0;
+              target.isShielding = false;
+              target.shieldStun = 180;
+              events.push({ type: 'shield_break', id: target.id, x: target.x, y: target.y - target.height / 2 });
+            }
+          } else {
+            target.damageRate += proj.damage;
+            
+            const kbMagnitude = proj.baseKb + (target.damageRate * proj.scaleKb);
+            let dirX = Math.sign(proj.vx) || 1;
+            let dirY = -0.4;
+
+            const len = Math.sqrt(dirX * dirX + dirY * dirY);
+            dirX /= len;
+            dirY /= len;
+
+            target.vx = kbMagnitude * dirX;
+            target.vy = kbMagnitude * dirY;
+            target.grounded = false;
+            target.hitStun = Math.round(kbMagnitude * 2.5);
+
+            events.push({
+              type: 'hit',
+              attackerId: proj.ownerId,
+              targetId: target.id,
+              damage: proj.damage,
+              damageRate: target.damageRate,
+              knockback: kbMagnitude,
+              x: proj.x,
+              y: proj.y
+            });
+          }
+          break;
+        }
+      }
+    }
+
+    if (destroyed) {
+      projectiles.splice(i, 1);
+    }
+  }
+}
+
 // Core Game Loop
 let lastTime = Date.now();
 function gameLoop() {
@@ -700,6 +858,9 @@ function gameLoop() {
       updatePlayer(id);
     }
 
+    // Update projectiles physics
+    updateProjectiles();
+
     // 3. Broadcast game state to all players
     const statePacket = {
       type: 'state',
@@ -711,6 +872,7 @@ function gameLoop() {
           id: p.id,
           name: p.name,
           color: p.color,
+          characterType: p.characterType,
           x: Math.round(p.x),
           y: Math.round(p.y),
           width: p.width,
@@ -734,6 +896,13 @@ function gameLoop() {
           respawning: p.respawnTimer > 0
         };
       }),
+      projectiles: projectiles.map(proj => ({
+        id: proj.id,
+        x: Math.round(proj.x),
+        y: Math.round(proj.y),
+        size: proj.size,
+        color: proj.color
+      })),
       events: [...events]
     };
 
