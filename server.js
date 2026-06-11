@@ -53,6 +53,9 @@ const players = {};      // id -> player object
 const clientInputs = {}; // id -> current inputs
 const prevInputs = {};   // id -> inputs from the previous tick
 let events = [];         // List of game events that happened in the current tick
+let matchState = 'playing'; // 'playing' or 'ended'
+let matchEndTimer = 0;      // Ticks remaining in the match end screen
+let matchWinner = null;     // Winner details
 
 // Helper to get a random spawn point
 function getRandomSpawnPoint() {
@@ -82,6 +85,7 @@ function createPlayer(id, name) {
     jumpCount: 0,
     damageRate: 0, // Starts at 0.0%
     stocks: 3,
+    isEliminated: false,
     isShielding: false,
     shieldHealth: 100,
     shieldStun: 0, // Ticks of stun if shield is broken
@@ -165,6 +169,7 @@ wss.on('connection', (ws) => {
         color: players[playerId].color
       });
       delete players[playerId];
+      checkMatchEnd(); // Check if match should end now
     }
     delete clientInputs[playerId];
     delete prevInputs[playerId];
@@ -174,6 +179,8 @@ wss.on('connection', (ws) => {
 // Update single player physics
 function updatePlayer(id) {
   const p = players[id];
+  if (p.isEliminated) return;
+
   const inputs = clientInputs[id] || {};
   const prevIn = prevInputs[id] || {};
 
@@ -219,9 +226,9 @@ function updatePlayer(id) {
     p.vy += 0.4;
     p.vy = Math.min(p.vy, 15); // terminal velocity
 
-    // Slow down gradually (lower friction in air when in hitstun)
-    p.vx *= 0.98;
-    p.vy *= 0.98;
+    // Slow down gradually (calibrated tighter friction to prevent excessive floating)
+    p.vx *= 0.95;
+    p.vy *= 0.95;
 
     p.x += p.vx;
     p.y += p.vy;
@@ -447,12 +454,12 @@ function performAttack(attacker, type, chargeRatio) {
         }
       } else {
         // Normal hit connection
-        const dmg = type === 'strong' ? (12 + chargeRatio * 10) : 6;
+        const dmg = type === 'strong' ? (10 + chargeRatio * 8) : 5.5;
         target.damageRate += dmg;
 
-        // Knockback physics formula
-        const baseKb = type === 'strong' ? (8 + chargeRatio * 6) : 4.5;
-        const scaleKb = type === 'strong' ? 0.16 : 0.08;
+        // Knockback physics formula (calibrated to prevent single-hit KOs at low damage)
+        const baseKb = type === 'strong' ? (5.0 + chargeRatio * 4) : 2.5;
+        const scaleKb = type === 'strong' ? 0.12 : 0.05;
         const kbMagnitude = baseKb + (target.damageRate * scaleKb);
 
         // Vector direction: angled slightly upwards
@@ -553,11 +560,12 @@ function resolveCollisions(p, inputs) {
 
 // Check blast zone boundaries for KOs
 function checkKO(p) {
+  if (p.isEliminated) return;
+
   const b = STAGE.blastZones;
   if (p.x < b.left || p.x > b.right || p.y < b.top || p.y > b.bottom) {
     // Player is KO'd!
     p.stocks--;
-    p.respawnTimer = 90; // Wait 1.5 seconds to respawn
     p.vx = 0;
     p.vy = 0;
 
@@ -572,7 +580,98 @@ function checkKO(p) {
     });
 
     console.log(`${p.name} was KO'd! Remaining stocks: ${p.stocks}`);
+
+    if (p.stocks <= 0) {
+      p.stocks = 0;
+      p.isEliminated = true;
+      p.respawnTimer = 0; // Do not respawn
+      events.push({
+        type: 'eliminated',
+        id: p.id,
+        name: p.name,
+        color: p.color
+      });
+      checkMatchEnd();
+    } else {
+      p.respawnTimer = 90; // Wait 1.5 seconds to respawn
+    }
   }
+}
+
+// Check if match is finished (only one player remains with stocks > 0)
+function checkMatchEnd() {
+  if (matchState !== 'playing') return;
+
+  const activePlayers = Object.values(players).filter(p => !p.isEliminated);
+  const totalPlayersCount = Object.keys(players).length;
+
+  if (totalPlayersCount === 1) {
+    // Single player practice mode - if they die, show Game Over and restart after 3 seconds
+    const p = activePlayers[0];
+    if (!p) {
+      matchState = 'ended';
+      matchEndTimer = 180; // 3 seconds
+      matchWinner = null;
+      events.push({
+        type: 'match_end',
+        winnerName: '',
+        winnerColor: '#ffffff'
+      });
+    }
+  } else if (totalPlayersCount > 1) {
+    // Multiplayer mode
+    if (activePlayers.length === 1) {
+      matchState = 'ended';
+      matchEndTimer = 300; // 5 seconds victory screen
+      matchWinner = activePlayers[0];
+      events.push({
+        type: 'match_end',
+        winnerId: matchWinner.id,
+        winnerName: matchWinner.name,
+        winnerColor: matchWinner.color
+      });
+    } else if (activePlayers.length === 0) {
+      matchState = 'ended';
+      matchEndTimer = 300; // 5 seconds
+      matchWinner = null;
+      events.push({
+        type: 'match_end',
+        winnerName: 'DRAW',
+        winnerColor: '#9ca3af'
+      });
+    }
+  }
+}
+
+// Restart match state for next round
+function restartMatch() {
+  matchState = 'playing';
+  matchWinner = null;
+
+  for (const id in players) {
+    const p = players[id];
+    const spawn = getRandomSpawnPoint();
+    p.x = spawn.x;
+    p.y = spawn.y;
+    p.vx = 0;
+    p.vy = 0;
+    p.damageRate = 0;
+    p.stocks = 3;
+    p.isEliminated = false;
+    p.respawnTimer = 0;
+    p.invulnerableTimer = 120;
+    p.grounded = false;
+    p.jumpCount = 0;
+    p.isAttacking = false;
+    p.isCharging = false;
+    p.chargeTime = 0;
+    p.hitStun = 0;
+    p.shieldStun = 0;
+    p.shieldHealth = 100;
+  }
+
+  events.push({ type: 'match_start' });
+  console.log('Match restarted.');
 }
 
 // Core Game Loop
@@ -582,14 +681,24 @@ function gameLoop() {
   const dt = now - lastTime;
 
   if (dt >= TICK_TIME) {
-    // 1. Update all players
+    // 1. If match is ended, decrement timer
+    if (matchState === 'ended') {
+      matchEndTimer--;
+      if (matchEndTimer <= 0) {
+        restartMatch();
+      }
+    }
+
+    // 2. Update all players
     for (const id in players) {
       updatePlayer(id);
     }
 
-    // 2. Broadcast game state to all players
+    // 3. Broadcast game state to all players
     const statePacket = {
       type: 'state',
+      matchState: matchState,
+      matchWinner: matchWinner ? { name: matchWinner.name, color: matchWinner.color } : null,
       players: Object.keys(players).map(id => {
         const p = players[id];
         return {
@@ -605,6 +714,7 @@ function gameLoop() {
           facing: p.facing,
           damageRate: p.damageRate,
           stocks: p.stocks,
+          isEliminated: p.isEliminated,
           isShielding: p.isShielding,
           shieldHealth: Math.round(p.shieldHealth),
           isAttacking: p.isAttacking,

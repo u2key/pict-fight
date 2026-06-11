@@ -509,7 +509,10 @@ function updateHUD() {
   let html = '';
   currentGameState.players.forEach(p => {
     const isMe = p.id === myPlayerId;
-    const activeClass = isMe ? 'my-player' : 'active';
+    let cardClass = isMe ? 'my-player' : 'active';
+    if (p.isEliminated) {
+      cardClass += ' defeated';
+    }
     
     // Smooth damage color transition (green -> yellow -> red)
     let dmgColor = '#ffffff';
@@ -522,20 +525,24 @@ function updateHUD() {
     }
 
     // Shake heavy damage percentages
-    const isHeavyDamage = p.damageRate >= 100;
+    const isHeavyDamage = p.damageRate >= 100 && !p.isEliminated;
     const heavyClass = isHeavyDamage ? 'shake-text' : '';
 
     // Stocks dots markup
     let stockDots = '';
     for (let i = 0; i < 3; i++) {
-      const lost = i >= p.stocks ? 'lost' : '';
+      const lost = i >= p.stocks || p.isEliminated ? 'lost' : '';
       stockDots += `<span class="stock-dot ${lost}" style="--accent-color: ${p.color}"></span>`;
     }
 
+    const damageDisplay = p.isEliminated 
+      ? '<span style="color: #ef4444; font-size: 1.1rem; font-weight: 800; letter-spacing: 1px;">DEFEATED</span>'
+      : `${p.damageRate.toFixed(1)}%`;
+
     html += `
-      <div class="player-hud-card ${activeClass}" style="--accent-color: ${p.color}">
+      <div class="player-hud-card ${cardClass}" style="--accent-color: ${p.color}; opacity: ${p.isEliminated ? 0.45 : 1.0}">
         <div class="hud-name">${p.name} ${isMe ? '(You)' : ''}</div>
-        <div class="hud-damage ${heavyClass}" style="color: ${dmgColor}">${p.damageRate.toFixed(1)}%</div>
+        <div class="hud-damage ${heavyClass}" style="color: ${dmgColor}">${damageDisplay}</div>
         <div class="hud-stocks">
           ${stockDots}
         </div>
@@ -958,7 +965,7 @@ function render() {
 
   // 5. Draw players
   currentGameState.players.forEach(p => {
-    if (!p.respawning) {
+    if (!p.respawning && !p.isEliminated) {
       drawPictogram(ctx, p);
     }
   });
@@ -969,6 +976,24 @@ function render() {
   // 7. Update and Draw screen notifications
   updateAnnouncements();
   drawAnnouncements(ctx);
+
+  // 7.5 Spectator notice if eliminated
+  const me = currentGameState.players.find(p => p.id === myPlayerId);
+  if (me && me.isEliminated && currentGameState.matchState === 'playing') {
+    ctx.save();
+    ctx.fillStyle = '#ef4444';
+    ctx.font = 'bold 20px Outfit';
+    ctx.textAlign = 'center';
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#ef4444';
+    ctx.fillText('ELIMINATED - SPECTATING ACTIVE MATCH', canvas.width / 2, 45);
+    ctx.restore();
+  }
+
+  // 7.8 Draw Match End Victory Screen Overlay
+  if (currentGameState.matchState === 'ended') {
+    drawMatchEndOverlay(ctx);
+  }
 
   // Draw Help Overlay if holding H key
   if (keys.KeyH) {
@@ -1106,5 +1131,47 @@ function drawHelpOverlay(ctx) {
   ctx.font = '400 12px Outfit';
   ctx.fillText('Getting knocked beyond the screen bounds results in a KO.', x + 140, mechY + 46);
 
+  ctx.restore();
+}
+
+// Draw Match End victory overlay card on top of canvas
+function drawMatchEndOverlay(ctx) {
+  ctx.save();
+  // Dark overlay
+  ctx.fillStyle = 'rgba(11, 15, 25, 0.75)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  
+  // Game Over text
+  ctx.font = '800 72px Outfit';
+  ctx.fillStyle = '#ef4444'; // Red
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = '#ef4444';
+  ctx.fillText('MATCH SET!', canvas.width / 2, canvas.height / 2 - 50);
+  
+  // Winner text
+  if (currentGameState.matchWinner) {
+    const winner = currentGameState.matchWinner;
+    ctx.font = '600 28px Outfit';
+    ctx.fillStyle = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = winner.color;
+    ctx.fillText('VICTORY TO', canvas.width / 2, canvas.height / 2 + 30);
+    
+    ctx.font = '800 48px Outfit';
+    ctx.fillStyle = winner.color;
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = winner.color;
+    ctx.fillText(winner.name.toUpperCase(), canvas.width / 2, canvas.height / 2 + 85);
+  } else {
+    // Practice mode restart
+    ctx.font = '600 32px Outfit';
+    ctx.fillStyle = '#9ca3af';
+    ctx.shadowBlur = 0;
+    ctx.fillText('PRACTICE OVER - RESTARTING...', canvas.width / 2, canvas.height / 2 + 40);
+  }
+  
   ctx.restore();
 }
