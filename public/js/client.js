@@ -14,6 +14,12 @@ const nicknameInput = document.getElementById('nickname-input');
 const playerCards = document.getElementById('player-cards');
 const pingText = document.getElementById('ping-text');
 
+// Load saved nickname if exists from localStorage
+const savedNickname = localStorage.getItem('pict_fight_nickname');
+if (savedNickname && nicknameInput) {
+  nicknameInput.value = savedNickname;
+}
+
 // Client State
 let myPlayerId = null;
 let currentGameState = { players: [] };
@@ -582,6 +588,9 @@ function updateHUD() {
 joinForm.addEventListener('submit', () => {
   const nickname = nicknameInput.value.trim();
   if (nickname.length >= 2 && nickname.length <= 12) {
+    // Save nickname to browser local storage for future visits
+    localStorage.setItem('pict_fight_nickname', nickname);
+
     // 1. Initialize audio Context (requires user interaction gesture)
     initAudio();
     
