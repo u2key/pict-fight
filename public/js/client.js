@@ -1,6 +1,6 @@
 // Establish WebSocket Connection
 const socketProtocol = window.location.protocol === 'https:' ? 'wss://' : 'ws://';
-const ws = new WebSocket(socketProtocol + window.location.host);
+const ws = new WebSocket(socketProtocol + window.location.host + pict-fight-socket);
 
 // Canvas and Rendering context
 const canvas = document.getElementById('game-canvas');
