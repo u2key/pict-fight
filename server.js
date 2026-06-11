@@ -401,9 +401,9 @@ function performAttack(attacker, type, chargeRatio) {
     // Blaster Character: Spawn Projectile instead of Melee check
     const size = type === 'strong' ? (12 + chargeRatio * 18) : 10;
     const speed = type === 'strong' ? (10 - chargeRatio * 4) : 12;
-    const dmg = type === 'strong' ? (8 + chargeRatio * 8) : 4.5;
-    const baseKb = type === 'strong' ? (3.5 + chargeRatio * 3.5) : 1.8;
-    const scaleKb = type === 'strong' ? (0.08 + chargeRatio * 0.04) : 0.03;
+    const dmg = type === 'strong' ? (6.5 + chargeRatio * 6.5) : 3.5;
+    const baseKb = type === 'strong' ? (2.0 + chargeRatio * 3.0) : 0.8;
+    const scaleKb = type === 'strong' ? (0.04 + chargeRatio * 0.04) : 0.01;
 
     // Broadcast attack swing event for visual client effects
     events.push({
