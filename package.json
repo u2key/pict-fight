@@ -1,0 +1,22 @@
+{
+  "name": "pict-fight",
+  "version": "0.1.0",
+  "description": "A lightweight online multiplayer pictogram fighting game",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [
+    "multiplayer",
+    "fighting-game",
+    "pictogram",
+    "websocket",
+    "canvas"
+  ],
+  "author": "Antigravity",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.16.0"
+  }
+}

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="pict-fight - A hyper-lightweight, real-time multiplayer pictogram battle arena game using HTML5 Canvas and Node.js.">
+  <title>pict-fight | Pictogram Battle Arena</title>
+  
+  <!-- Sleek Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- Background Animated Gradients -->
+  <div class="bg-glow"></div>
+
+  <!-- Main Container -->
+  <main id="game-app">
+    
+    <!-- Title Header -->
+    <header class="game-header">
+      <h1 class="logo">pict-<span>fight</span></h1>
+      <p class="tagline">Hyper-Lightweight Pictogram Fighting Arena</p>
+    </header>
+
+    <!-- Lobby / Join Screen -->
+    <section id="lobby-panel" class="lobby-card">
+      <div class="lobby-content">
+        <h2>Enter the Arena</h2>
+        <p class="lobby-desc">Pick your nickname and join the real-time battleground. Knock your opponents out of the screen bounds by building up damage rates!</p>
+        
+        <form id="join-form" onsubmit="return false;">
+          <div class="input-group">
+            <input type="text" id="nickname-input" placeholder="Player Nickname" minlength="2" maxlength="12" required autocomplete="off">
+            <span class="focus-border"></span>
+          </div>
+          
+          <button type="submit" id="btn-join" class="btn btn-primary">Join Match</button>
+        </form>
+      </div>
+
+      <!-- Controls Guide in Lobby -->
+      <div class="controls-guide">
+        <h3>Combat Control Guide</h3>
+        <div class="keys-grid">
+          <div class="key-item"><kbd>←</kbd> <kbd>→</kbd> or <kbd>A</kbd> <kbd>D</kbd> <span>Move Left / Right</span></div>
+          <div class="key-item"><kbd>↑</kbd> or <kbd>W</kbd> <span>Jump / Double Jump</span></div>
+          <div class="key-item"><kbd>↓</kbd> or <kbd>S</kbd> <span>Drop Down / Pass Platforms</span></div>
+          <div class="key-item"><kbd>Z</kbd> or <kbd>J</kbd> <span>Normal Strike (Quick Attack)</span></div>
+          <div class="key-item"><kbd>X</kbd> or <kbd>K</kbd> <span>Max Charge Strike (Hold &amp; Release)</span></div>
+          <div class="key-item"><kbd>C</kbd> or <kbd>L</kbd> <span>Shield / Guard (Absorbs damage)</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Game Viewport Panel (Initially Hidden) -->
+    <section id="arena-panel" class="arena-card hidden">
+      <div class="arena-wrapper">
+        <!-- Canvas Element -->
+        <canvas id="game-canvas" width="1200" height="800"></canvas>
+        
+        <!-- Scoreboard Overlay -->
+        <div class="game-hud">
+          <div id="player-cards" class="player-cards-container">
+            <!-- Dynamic Player HUD Cards injected here -->
+          </div>
+        </div>
+        
+        <!-- Connection Status & Ping indicator -->
+        <div class="arena-footer">
+          <div class="latency-indicator">
+            <span class="status-dot online"></span>
+            <span id="ping-text">Ping: -- ms</span>
+          </div>
+          <div class="game-rules-tip">Tip: Press <kbd>C</kbd> or <kbd>L</kbd> on the ground to block heavy knockbacks!</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Game Client JS -->
+  <script src="js/client.js"></script>
+</body>
+</html>

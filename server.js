@@ -1,0 +1,650 @@
+const express = require('express');
+const http = require('http');
+const WebSocket = require('ws');
+const path = require('path');
+
+const app = express();
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Game Constants
+const TICK_RATE = 60;
+const TICK_TIME = 1000 / TICK_RATE;
+
+const STAGE = {
+  width: 1200,
+  height: 800,
+  mainPlatform: { x1: 300, x2: 900, y1: 500, y2: 530 },
+  platforms: [
+    { x1: 350, x2: 550, y: 390 }, // Left semi-solid platform
+    { x1: 650, x2: 850, y: 390 }, // Right semi-solid platform
+    { x1: 500, x2: 700, y: 280 }  // Top semi-solid platform
+  ],
+  blastZones: {
+    left: -200,
+    right: 1400,
+    top: -300,
+    bottom: 1000
+  }
+};
+
+const SPAWN_POINTS = [
+  { x: 450, y: 350 },
+  { x: 750, y: 350 },
+  { x: 600, y: 200 }
+];
+
+const COLORS = [
+  '#3b82f6', // P1: Vibrant Blue
+  '#ef4444', // P2: Vibrant Red
+  '#10b981', // P3: Vibrant Green
+  '#f59e0b', // P4: Amber/Orange
+  '#ec4899', // P5: Pink
+  '#8b5cf6'  // P6: Purple
+];
+
+let colorIndex = 0;
+
+// Game State
+const players = {};      // id -> player object
+const clientInputs = {}; // id -> current inputs
+const prevInputs = {};   // id -> inputs from the previous tick
+let events = [];         // List of game events that happened in the current tick
+
+// Helper to get a random spawn point
+function getRandomSpawnPoint() {
+  return SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
+}
+
+// Player initialization
+function createPlayer(id, name) {
+  const spawn = getRandomSpawnPoint();
+  const color = COLORS[colorIndex % COLORS.length];
+  colorIndex++;
+
+  return {
+    id,
+    name: name || `Player ${colorIndex}`,
+    color,
+    x: spawn.x,
+    y: spawn.y,
+    prevX: spawn.x,
+    prevY: spawn.y,
+    vx: 0,
+    vy: 0,
+    width: 30,
+    height: 55,
+    facing: 1, // 1 for right, -1 for left
+    grounded: false,
+    jumpCount: 0,
+    damageRate: 0, // Starts at 0.0%
+    stocks: 3,
+    isShielding: false,
+    shieldHealth: 100,
+    shieldStun: 0, // Ticks of stun if shield is broken
+    hitStun: 0,    // Ticks of stun when knocked back
+    invulnerableTimer: 120, // Spawn invulnerability (2 seconds at 60Hz)
+    respawnTimer: 0,       // Cooldown before returning to play after KO
+    isAttacking: false,
+    attackType: null, // 'normal' or 'strong'
+    attackFrame: 0,
+    attackCooldown: 0,
+    isCharging: false,
+    chargeTime: 0, // How long strong attack has been charged
+    hitPlayers: [] // Array of player IDs hit in the current attack swing
+  };
+}
+
+// WebSocket Connection Handling
+wss.on('connection', (ws) => {
+  const playerId = 'p_' + Math.random().toString(36).substr(2, 9);
+  console.log(`Client connected. Assigning ID: ${playerId}`);
+
+  // Send a welcome packet with client ID and stage configuration
+  ws.send(JSON.stringify({
+    type: 'welcome',
+    id: playerId,
+    stage: STAGE
+  }));
+
+  // Setup empty inputs
+  clientInputs[playerId] = {
+    left: false,
+    right: false,
+    jump: false,
+    down: false,
+    attack: false,
+    strongAttack: false,
+    shield: false
+  };
+  prevInputs[playerId] = { ...clientInputs[playerId] };
+
+  ws.on('message', (message) => {
+    try {
+      const data = JSON.parse(message);
+
+      if (data.type === 'join') {
+        // Player joins the arena
+        players[playerId] = createPlayer(playerId, data.name);
+        events.push({
+          type: 'join',
+          name: players[playerId].name,
+          color: players[playerId].color,
+          x: players[playerId].x,
+          y: players[playerId].y
+        });
+        console.log(`${players[playerId].name} joined the game.`);
+      } else if (data.type === 'input') {
+        // Update input buffer
+        if (clientInputs[playerId]) {
+          clientInputs[playerId] = {
+            left: !!data.inputs.left,
+            right: !!data.inputs.right,
+            jump: !!data.inputs.jump,
+            down: !!data.inputs.down,
+            attack: !!data.inputs.attack,
+            strongAttack: !!data.inputs.strongAttack,
+            shield: !!data.inputs.shield
+          };
+        }
+      }
+    } catch (err) {
+      console.error('Error parsing WebSocket message:', err);
+    }
+  });
+
+  ws.on('close', () => {
+    console.log(`Client disconnected: ${playerId}`);
+    if (players[playerId]) {
+      events.push({
+        type: 'leave',
+        name: players[playerId].name,
+        color: players[playerId].color
+      });
+      delete players[playerId];
+    }
+    delete clientInputs[playerId];
+    delete prevInputs[playerId];
+  });
+});
+
+// Update single player physics
+function updatePlayer(id) {
+  const p = players[id];
+  const inputs = clientInputs[id] || {};
+  const prevIn = prevInputs[id] || {};
+
+  // 1. Respawn State
+  if (p.respawnTimer > 0) {
+    p.respawnTimer--;
+    if (p.respawnTimer === 0) {
+      const spawn = getRandomSpawnPoint();
+      p.x = spawn.x;
+      p.y = spawn.y;
+      p.vx = 0;
+      p.vy = 0;
+      p.damageRate = 0;
+      p.invulnerableTimer = 120; // 2 seconds of invulnerability
+      p.grounded = false;
+      p.jumpCount = 0;
+      p.isAttacking = false;
+      p.isCharging = false;
+      p.chargeTime = 0;
+      p.hitStun = 0;
+      p.shieldStun = 0;
+      p.shieldHealth = 100;
+      events.push({ type: 'respawn', id: p.id, x: p.x, y: p.y });
+    }
+    // Save previous inputs
+    prevInputs[id] = { ...inputs };
+    return;
+  }
+
+  // Invulnerability timer
+  if (p.invulnerableTimer > 0) {
+    p.invulnerableTimer--;
+  }
+
+  // Save current position as previous before applying movement
+  p.prevX = p.x;
+  p.prevY = p.y;
+
+  // 2. Hitstun State (Fly away, restricted controls)
+  if (p.hitStun > 0) {
+    p.hitStun--;
+    // Apply gravity
+    p.vy += 0.4;
+    p.vy = Math.min(p.vy, 15); // terminal velocity
+
+    // Slow down gradually (lower friction in air when in hitstun)
+    p.vx *= 0.98;
+    p.vy *= 0.98;
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Check boundaries/KO
+    checkKO(p);
+
+    // Save previous inputs
+    prevInputs[id] = { ...inputs };
+    return;
+  }
+
+  // 3. Shield Stun State (dazed if shield is broken)
+  if (p.shieldStun > 0) {
+    p.shieldStun--;
+    // Apply gravity
+    p.vy += 0.4;
+    p.vy = Math.min(p.vy, 15);
+    p.vx *= 0.8; // High ground friction
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    resolveCollisions(p, inputs);
+    checkKO(p);
+
+    prevInputs[id] = { ...inputs };
+    return;
+  }
+
+  // 4. Shielding Action
+  if (inputs.shield && p.grounded && !p.isAttacking && !p.isCharging) {
+    p.isShielding = true;
+    p.vx *= 0.7; // Brake quickly
+    p.shieldHealth -= 0.6; // Drain shield
+    if (p.shieldHealth <= 0) {
+      p.shieldHealth = 0;
+      p.isShielding = false;
+      p.shieldStun = 180; // 3 seconds of daze
+      events.push({ type: 'shield_break', id: p.id, x: p.x, y: p.y - p.height / 2 });
+    }
+  } else {
+    p.isShielding = false;
+    if (p.shieldHealth < 100) {
+      p.shieldHealth = Math.min(100, p.shieldHealth + 0.3); // Regenerate shield
+    }
+  }
+
+  // 5. Strong Attack Charging Action
+  if (inputs.strongAttack && p.grounded && !p.isAttacking && !p.isShielding) {
+    p.isCharging = true;
+    p.chargeTime = Math.min(p.chargeTime + 1, 60); // Charge up to 60 ticks (1s)
+    p.vx *= 0.8; // Friction deceleration while charging
+  } else if (p.isCharging && !inputs.strongAttack) {
+    // Release Strong Attack!
+    p.isCharging = false;
+    p.isAttacking = true;
+    p.attackType = 'strong';
+    p.attackFrame = 15;
+    p.attackCooldown = 35;
+    p.hitPlayers = [];
+
+    // Spawn strike event immediately
+    const chargeRatio = p.chargeTime / 60.0;
+    performAttack(p, 'strong', chargeRatio);
+  }
+
+  // 6. Normal Movement and Normal Attacks (if not shielding/charging)
+  if (!p.isShielding && !p.isCharging) {
+    // Horizontal acceleration
+    const accel = p.grounded ? 0.8 : 0.4;
+    const maxSpeed = p.grounded ? 8 : 6;
+
+    if (inputs.left) {
+      p.vx = Math.max(-maxSpeed, p.vx - accel);
+      p.facing = -1;
+    } else if (inputs.right) {
+      p.vx = Math.min(maxSpeed, p.vx + accel);
+      p.facing = 1;
+    } else {
+      // Apply deceleration/friction
+      const friction = p.grounded ? 0.75 : 0.95;
+      p.vx *= friction;
+      if (Math.abs(p.vx) < 0.05) p.vx = 0;
+    }
+
+    // Gravity
+    p.vy += 0.4;
+    p.vy = Math.min(p.vy, 15); // Terminal velocity
+
+    // Jumping (needs trigger check: pressed now, not pressed last tick)
+    const jumpPressed = inputs.jump && !prevIn.jump;
+    if (jumpPressed) {
+      if (p.grounded) {
+        p.vy = -11;
+        p.grounded = false;
+        p.jumpCount = 1;
+        events.push({ type: 'jump', x: p.x, y: p.y, double: false });
+      } else if (p.jumpCount < 2) {
+        p.vy = -10.5;
+        p.jumpCount = 2;
+        events.push({ type: 'jump', x: p.x, y: p.y, double: true });
+      }
+    }
+
+    // Drop down platform
+    if (inputs.down && p.grounded) {
+      // Check if standing on one of the pass-through platforms
+      const standOnPassThrough = STAGE.platforms.some(plat => {
+        const px1 = p.x - p.width / 2;
+        const px2 = p.x + p.width / 2;
+        return Math.abs(p.y - plat.y) < 1.0 && px1 < plat.x2 && px2 > plat.x1;
+      });
+      if (standOnPassThrough) {
+        p.y += 5; // force drop down
+        p.grounded = false;
+      }
+    }
+
+    // Cooldown decrement
+    if (p.attackCooldown > 0) p.attackCooldown--;
+
+    // Execute Normal Attack
+    if (inputs.attack && !prevIn.attack && p.attackCooldown === 0 && !p.isAttacking) {
+      p.isAttacking = true;
+      p.attackType = 'normal';
+      p.attackFrame = 10;
+      p.attackCooldown = 20;
+      p.hitPlayers = [];
+
+      performAttack(p, 'normal', 0);
+    }
+  }
+
+  // Update attack frame animation
+  if (p.isAttacking) {
+    p.attackFrame--;
+    if (p.attackFrame <= 0) {
+      p.isAttacking = false;
+      p.attackType = null;
+    }
+  }
+
+  // Apply final velocity to position
+  p.x += p.vx;
+  p.y += p.vy;
+
+  // Resolve collisions
+  p.grounded = false; // reset grounded flag, let resolver set it
+  resolveCollisions(p, inputs);
+
+  // Check blast zones/KO
+  checkKO(p);
+
+  // Save inputs for transition checks
+  prevInputs[id] = { ...inputs };
+}
+
+// Perform attack hitbox checks
+function performAttack(attacker, type, chargeRatio) {
+  const aw = type === 'strong' ? 70 : 55;
+  const ah = 40;
+  const ox = attacker.facing * (type === 'strong' ? 40 : 30);
+
+  const ax1 = attacker.x + ox - aw / 2;
+  const ax2 = attacker.x + ox + aw / 2;
+  const ay1 = attacker.y - attacker.height / 2 - ah / 2;
+  const ay2 = attacker.y - attacker.height / 2 + ah / 2;
+
+  // Broadcast attack swing event for visual client effects
+  events.push({
+    type: 'attack_swing',
+    id: attacker.id,
+    attackType: type,
+    chargeRatio,
+    facing: attacker.facing,
+    x: attacker.x,
+    y: attacker.y - attacker.height / 2
+  });
+
+  // Check all potential targets
+  for (const id in players) {
+    if (id === attacker.id) continue;
+    const target = players[id];
+
+    // Ignore invulnerable or respawning targets
+    if (target.respawnTimer > 0 || target.invulnerableTimer > 0) continue;
+
+    const tx1 = target.x - target.width / 2;
+    const tx2 = target.x + target.width / 2;
+    const ty1 = target.y - target.height;
+    const ty2 = target.y;
+
+    // AABB intersection check
+    const overlap = ax1 < tx2 && ax2 > tx1 && ay1 < ty2 && ay2 > ty1;
+    if (overlap && !attacker.hitPlayers.includes(target.id)) {
+      attacker.hitPlayers.push(target.id);
+
+      // Handle target shielding
+      if (target.isShielding) {
+        const shieldDmg = type === 'strong' ? 25 * (1 + chargeRatio) : 12;
+        target.shieldHealth -= shieldDmg;
+
+        // Knockback on shield (pushed back slightly)
+        const kbDirX = Math.sign(target.x - attacker.x) || attacker.facing;
+        target.vx = kbDirX * (type === 'strong' ? 6 : 3);
+        target.vy = -1.5;
+        target.grounded = false;
+
+        events.push({
+          type: 'shield_hit',
+          targetId: target.id,
+          x: target.x,
+          y: target.y - target.height / 2
+        });
+
+        // Trigger shield break if shield broke
+        if (target.shieldHealth <= 0) {
+          target.shieldHealth = 0;
+          target.isShielding = false;
+          target.shieldStun = 180;
+          events.push({ type: 'shield_break', id: target.id, x: target.x, y: target.y - target.height / 2 });
+        }
+      } else {
+        // Normal hit connection
+        const dmg = type === 'strong' ? (12 + chargeRatio * 10) : 6;
+        target.damageRate += dmg;
+
+        // Knockback physics formula
+        const baseKb = type === 'strong' ? (8 + chargeRatio * 6) : 4.5;
+        const scaleKb = type === 'strong' ? 0.16 : 0.08;
+        const kbMagnitude = baseKb + (target.damageRate * scaleKb);
+
+        // Vector direction: angled slightly upwards
+        let dirX = Math.sign(target.x - attacker.x) || attacker.facing;
+        let dirY = -0.55;
+
+        // Normalize vector
+        const len = Math.sqrt(dirX * dirX + dirY * dirY);
+        dirX /= len;
+        dirY /= len;
+
+        // Apply knockback velocities
+        target.vx = kbMagnitude * dirX;
+        target.vy = kbMagnitude * dirY;
+        target.grounded = false;
+
+        // Hitstun is proportional to knockback
+        target.hitStun = Math.round(kbMagnitude * 2.5);
+
+        events.push({
+          type: 'hit',
+          attackerId: attacker.id,
+          targetId: target.id,
+          damage: dmg,
+          damageRate: target.damageRate,
+          knockback: kbMagnitude,
+          x: target.x,
+          y: target.y - target.height / 2
+        });
+      }
+    }
+  }
+}
+
+// Resolve collisions with stage platforms
+function resolveCollisions(p, inputs) {
+  // 1. Solid Main Platform Collision
+  const rx1 = STAGE.mainPlatform.x1;
+  const rx2 = STAGE.mainPlatform.x2;
+  const ry1 = STAGE.mainPlatform.y1;
+  const ry2 = STAGE.mainPlatform.y2;
+
+  const px1 = p.x - p.width / 2;
+  const px2 = p.x + p.width / 2;
+  const py1 = p.y - p.height;
+  const py2 = p.y;
+
+  const mainOverlap = px1 < rx2 && px2 > rx1 && py1 < ry2 && py2 > ry1;
+  if (mainOverlap) {
+    // Check previous positions to determine entry direction
+    const prev_px1 = p.prevX - p.width / 2;
+    const prev_px2 = p.prevX + p.width / 2;
+    const prev_py1 = p.prevY - p.height;
+    const prev_py2 = p.prevY;
+
+    if (prev_py2 <= ry1) {
+      // Landed on platform top
+      p.y = ry1;
+      p.vy = 0;
+      p.grounded = true;
+      p.jumpCount = 0;
+    } else if (prev_py1 >= ry2) {
+      // Bumped platform bottom
+      p.y = ry2 + p.height;
+      p.vy = 0;
+    } else if (prev_px2 <= rx1) {
+      // Collided with left wall
+      p.x = rx1 - p.width / 2;
+      p.vx = 0;
+    } else if (prev_px1 >= rx2) {
+      // Collided with right wall
+      p.x = rx2 + p.width / 2;
+      p.vx = 0;
+    }
+  }
+
+  // 2. Semi-Solid Platforms Collision (pass-through platforms)
+  if (p.vy >= 0 && !inputs.down) {
+    for (const plat of STAGE.platforms) {
+      const px1 = p.x - p.width / 2;
+      const px2 = p.x + p.width / 2;
+      const py2 = p.y;
+      const prev_py2 = p.prevY;
+
+      // Check if crossing from above to below
+      if (prev_py2 <= plat.y && py2 >= plat.y) {
+        if (px1 < plat.x2 && px2 > plat.x1) {
+          p.y = plat.y;
+          p.vy = 0;
+          p.grounded = true;
+          p.jumpCount = 0;
+          break; // Stop checking other platforms
+        }
+      }
+    }
+  }
+}
+
+// Check blast zone boundaries for KOs
+function checkKO(p) {
+  const b = STAGE.blastZones;
+  if (p.x < b.left || p.x > b.right || p.y < b.top || p.y > b.bottom) {
+    // Player is KO'd!
+    p.stocks--;
+    p.respawnTimer = 90; // Wait 1.5 seconds to respawn
+    p.vx = 0;
+    p.vy = 0;
+
+    events.push({
+      type: 'ko',
+      id: p.id,
+      name: p.name,
+      color: p.color,
+      stocks: p.stocks,
+      x: Math.max(Math.min(p.x, STAGE.width), 0),
+      y: Math.max(Math.min(p.y, STAGE.height), 0)
+    });
+
+    console.log(`${p.name} was KO'd! Remaining stocks: ${p.stocks}`);
+  }
+}
+
+// Core Game Loop
+let lastTime = Date.now();
+function gameLoop() {
+  const now = Date.now();
+  const dt = now - lastTime;
+
+  if (dt >= TICK_TIME) {
+    // 1. Update all players
+    for (const id in players) {
+      updatePlayer(id);
+    }
+
+    // 2. Broadcast game state to all players
+    const statePacket = {
+      type: 'state',
+      players: Object.keys(players).map(id => {
+        const p = players[id];
+        return {
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          x: Math.round(p.x),
+          y: Math.round(p.y),
+          width: p.width,
+          height: p.height,
+          vx: Math.round(p.vx * 10) / 10,
+          vy: Math.round(p.vy * 10) / 10,
+          facing: p.facing,
+          damageRate: p.damageRate,
+          stocks: p.stocks,
+          isShielding: p.isShielding,
+          shieldHealth: Math.round(p.shieldHealth),
+          isAttacking: p.isAttacking,
+          attackType: p.attackType,
+          attackFrame: p.attackFrame,
+          isCharging: p.isCharging,
+          chargeTime: p.chargeTime,
+          hitStun: p.hitStun,
+          shieldStun: p.shieldStun,
+          invulnerable: p.invulnerableTimer > 0 || p.respawnTimer > 0,
+          respawning: p.respawnTimer > 0
+        };
+      }),
+      events: [...events]
+    };
+
+    // Broadcast statePacket as JSON to everyone
+    const jsonStr = JSON.stringify(statePacket);
+    wss.clients.forEach(client => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(jsonStr);
+      }
+    });
+
+    // Clear accumulated events
+    events = [];
+
+    // Account for frame rate lag
+    lastTime = now - (dt % TICK_TIME);
+  }
+
+  // Queue next update tick
+  setTimeout(gameLoop, 1);
+}
+
+// Start game loop
+gameLoop();
+
+// Start serving on Port 3000
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Pict-Fight Server running on port ${PORT}`);
+});
