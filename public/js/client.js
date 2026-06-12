@@ -26,6 +26,9 @@ let currentGameState = { players: [] };
 let stageConfig = null;
 let connectionActive = false;
 
+// Dynamic Background Stripe Camouflage Effect State
+let activeStripeEffect = null;
+
 // Audio System (Web Audio API Synth)
 let audioCtx = null;
 
@@ -620,6 +623,19 @@ joinForm.addEventListener('submit', () => {
 // Canvas Drawing function for Pictogram Sticks
 function drawPictogram(ctx, p) {
   ctx.save();
+
+  // Camouflage check (blends with matching color background stripes)
+  let camouflaged = false;
+  if (activeStripeEffect && p.color === activeStripeEffect.color) {
+    if (p.x >= activeStripeEffect.x && p.x <= activeStripeEffect.x + activeStripeEffect.width) {
+      camouflaged = true;
+    }
+  }
+
+  if (camouflaged) {
+    ctx.globalAlpha = 0.04; // Blended into background
+  }
+
   ctx.translate(p.x, p.y);
   
   // Scale up heavy striker class
@@ -1004,7 +1020,20 @@ function render() {
   }
 
   // 2. Clear background and draw glowing digital grid
-  ctx.fillStyle = '#0c0f17';
+  // Slow time-based background transition (shifting space color)
+  const bgTime = Date.now() * 0.0001;
+  const bgR = Math.round(12 + Math.sin(bgTime) * 6);
+  const bgG = Math.round(15 + Math.cos(bgTime * 0.8) * 6);
+  const bgB = Math.round(23 + Math.sin(bgTime * 1.2) * 8);
+
+  const bgGrad = ctx.createRadialGradient(
+    canvas.width / 2, canvas.height / 2, 50,
+    canvas.width / 2, canvas.height / 2, canvas.width * 0.8
+  );
+  bgGrad.addColorStop(0, `rgb(${bgR}, ${bgG}, ${bgB})`);
+  bgGrad.addColorStop(1, '#05070a');
+
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   ctx.strokeStyle = 'rgba(255,255,255,0.025)';
@@ -1021,6 +1050,41 @@ function render() {
     ctx.moveTo(0, y);
     ctx.lineTo(canvas.width, y);
     ctx.stroke();
+  }
+
+  // 2.5 Dynamic Stripe camouflage trigger & rendering
+  if (!activeStripeEffect && Math.random() < 0.0015) {
+    const colors = [
+      '#3b82f6', // P1: Blue
+      '#ef4444', // P2: Red
+      '#10b981', // P3: Green
+      '#f59e0b', // P4: Orange
+      '#ec4899', // P5: Pink
+      '#8b5cf6'  // P6: Purple
+    ];
+    const colorIdx = Math.floor(Math.random() * colors.length);
+    activeStripeEffect = {
+      color: colors[colorIdx],
+      x: -400, // start off-screen
+      width: 300,
+      speed: 8.0
+    };
+  }
+
+  if (activeStripeEffect) {
+    activeStripeEffect.x += activeStripeEffect.speed;
+
+    ctx.save();
+    ctx.fillStyle = activeStripeEffect.color;
+    ctx.globalAlpha = 0.88; // solid enough to block same-color rendering
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = activeStripeEffect.color;
+    ctx.fillRect(activeStripeEffect.x, 0, activeStripeEffect.width, canvas.height);
+    ctx.restore();
+
+    if (activeStripeEffect.x > canvas.width) {
+      activeStripeEffect = null;
+    }
   }
 
   // 3. Render Stage Geometry
