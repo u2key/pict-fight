@@ -108,6 +108,8 @@ let matchEndTimer = 0;      // Ticks remaining in the match end screen
 let matchWinner = null;     // Winner details
 let projectiles = [];       // Active projectiles list
 let nextProjId = 0;         // ID index for projectiles
+let activeStripe = null;    // Active background stripe obstacle
+
 
 // Lobby client tracking for stage selection rights
 const lobbyClients = [];    // Array of player IDs in connection order
@@ -297,6 +299,7 @@ wss.on('connection', (ws) => {
         // Clear projectiles and match state
         projectiles = [];
         events = [];
+        activeStripe = null;
         matchState = 'playing';
         matchWinner = null;
 
@@ -1170,14 +1173,46 @@ function gameLoop() {
       updatePlayer(id);
     }
 
-    // Update projectiles physics
+     // Update projectiles physics
     updateProjectiles();
+
+    // Update background obstacle stripe physics
+    if (!activeStripe && Math.random() < 0.0015) {
+      const colors = [
+        '#3b82f6', // P1: Blue
+        '#ef4444', // P2: Red
+        '#10b981', // P3: Green
+        '#f59e0b', // P4: Orange
+        '#ec4899', // P5: Pink
+        '#8b5cf6'  // P6: Purple
+      ];
+      const colorIdx = Math.floor(Math.random() * colors.length);
+      activeStripe = {
+        color: colors[colorIdx],
+        x: -400, // start off-screen
+        width: 300,
+        speed: 8.0
+      };
+    }
+
+    if (activeStripe) {
+      activeStripe.x += activeStripe.speed;
+      if (activeStripe.x > 1200) {
+        activeStripe = null;
+      }
+    }
 
     // 3. Broadcast game state to all players
     const statePacket = {
       type: 'state',
       matchState: matchState,
       matchWinner: matchWinner ? { name: matchWinner.name, color: matchWinner.color } : null,
+      activeStripe: activeStripe ? {
+        color: activeStripe.color,
+        x: Math.round(activeStripe.x),
+        width: activeStripe.width,
+        speed: activeStripe.speed
+      } : null,
       players: Object.keys(players).map(id => {
         const p = players[id];
         return {

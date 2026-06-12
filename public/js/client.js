@@ -1091,27 +1091,10 @@ function render() {
   }
 
   // 2.5 Dynamic Stripe camouflage trigger & rendering
-  if (!activeStripeEffect && Math.random() < 0.0015) {
-    const colors = [
-      '#3b82f6', // P1: Blue
-      '#ef4444', // P2: Red
-      '#10b981', // P3: Green
-      '#f59e0b', // P4: Orange
-      '#ec4899', // P5: Pink
-      '#8b5cf6'  // P6: Purple
-    ];
-    const colorIdx = Math.floor(Math.random() * colors.length);
-    activeStripeEffect = {
-      color: colors[colorIdx],
-      x: -400, // start off-screen
-      width: 300,
-      speed: 8.0
-    };
-  }
+  // The stripe is now synchronized and updated by the server
+  activeStripeEffect = currentGameState.activeStripe || null;
 
   if (activeStripeEffect) {
-    activeStripeEffect.x += activeStripeEffect.speed;
-
     ctx.save();
     ctx.fillStyle = activeStripeEffect.color;
     ctx.globalAlpha = 0.88; // solid enough to block same-color rendering
@@ -1119,10 +1102,6 @@ function render() {
     ctx.shadowColor = activeStripeEffect.color;
     ctx.fillRect(activeStripeEffect.x, 0, activeStripeEffect.width, canvas.height);
     ctx.restore();
-
-    if (activeStripeEffect.x > canvas.width) {
-      activeStripeEffect = null;
-    }
   }
 
   // 3. Render Stage Geometry
