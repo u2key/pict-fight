@@ -1233,6 +1233,13 @@ function gameLoop() {
         size: proj.size,
         color: proj.color
       })),
+      platforms: STAGE.platforms.map(plat => ({
+        id: plat.id,
+        x1: Math.round(plat.x1),
+        y1: Math.round(plat.y1 !== undefined ? plat.y1 : plat.y),
+        x2: Math.round(plat.x2),
+        y2: Math.round(plat.y2 !== undefined ? plat.y2 : plat.y)
+      })),
       events: [...events]
     };
 

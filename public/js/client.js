@@ -1123,7 +1123,8 @@ function render() {
     ctx.restore();
 
     // Draw pass-through platforms
-    stageConfig.platforms.forEach(plat => {
+    const platformsToDraw = currentGameState.platforms || (stageConfig ? stageConfig.platforms : []);
+    platformsToDraw.forEach(plat => {
       ctx.save();
       ctx.shadowBlur = 10;
       ctx.shadowColor = '#f59e0b';
