@@ -373,7 +373,7 @@ function updatePlayer(id) {
       p.isAttacking = true;
       p.attackType = 'normal';
       p.attackFrame = isStriker ? 12 : 10;
-      p.attackCooldown = isStriker ? 25 : 20;
+      p.attackCooldown = 0; // Cooldown disabled for normal attack
       p.hitPlayers = [];
 
       // Step-in for striker to close distance
