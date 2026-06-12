@@ -576,7 +576,7 @@ function updatePlayer(id) {
     }
 
     // Apply conveyor terrain effect for Baumkuchen stage main platform
-    if (STAGE && STAGE.id === 'baumkuchen' && p.grounded && !p.standingOnPlatId) {
+    if (STAGE && STAGE.id === 'baumkuchen' && p.grounded && p.standingOnPlatId === 'main') {
       const conveyorSpeed = 0.6;
       p.vx = Math.min(maxSpeed, Math.max(-maxSpeed, p.vx + conveyorSpeed));
     }
@@ -860,6 +860,7 @@ function resolveCollisions(p, inputs) {
       p.vy = 0;
       p.grounded = true;
       p.jumpCount = 0;
+      p.standingOnPlatId = 'main';
     } else if (prev_py1 >= ry2) {
       // Bumped platform bottom
       p.y = ry2 + p.height;
