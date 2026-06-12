@@ -928,8 +928,8 @@ function gameLoop() {
 // Start game loop
 gameLoop();
 
-// Start serving on Port 3000
-const PORT = process.env.PORT || 3000;
+// Start serving on Port 25564
+const PORT = process.env.PORT || 25564;
 server.listen(PORT, () => {
   console.log(`Pict-Fight Server running on port ${PORT}`);
 });
