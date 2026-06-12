@@ -452,9 +452,11 @@ body {
 }
 
 .stage-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
   gap: 12px;
+  flex-wrap: wrap;
   max-width: 620px;
   margin: 0 auto 16px auto;
 }
