@@ -1158,6 +1158,7 @@ function render() {
         ctx.fill();
       });
       ctx.restore();
+      ctx.restore(); // Restore outer save state for the Baumkuchen block
     } else {
       // Draw Standard Main Platform Shadow Glow
       ctx.save();
