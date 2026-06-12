@@ -70,6 +70,7 @@ function createPlayer(id, name) {
   const color = COLORS[colorIndex % COLORS.length];
   colorIndex++;
   const characterType = Math.random() < 0.5 ? 'striker' : 'blaster';
+  const isStriker = characterType === 'striker';
 
   return {
     id,
@@ -82,8 +83,8 @@ function createPlayer(id, name) {
     prevY: spawn.y,
     vx: 0,
     vy: 0,
-    width: 30,
-    height: 55,
+    width: isStriker ? 38 : 30,
+    height: isStriker ? 69 : 55,
     facing: 1, // 1 for right, -1 for left
     grounded: false,
     jumpCount: 0,
@@ -296,13 +297,13 @@ function updatePlayer(id) {
     p.isCharging = false;
     p.isAttacking = true;
     p.attackType = 'strong';
-    p.attackFrame = isStriker ? 12 : 15;
-    p.attackCooldown = isStriker ? 22 : 35;
+    p.attackFrame = isStriker ? 20 : 15;
+    p.attackCooldown = isStriker ? 45 : 35;
     p.hitPlayers = [];
 
-    // Step-in for striker to close distance
+    // Step-in for striker to close distance (slightly heavier step)
     if (isStriker) {
-      p.vx += p.facing * 5.0;
+      p.vx += p.facing * 3.5;
     }
 
     // Spawn strike event immediately
@@ -313,9 +314,9 @@ function updatePlayer(id) {
   // 6. Normal Movement and Normal Attacks (if not shielding/charging)
   if (!p.isShielding && !p.isCharging) {
     const isStriker = p.characterType === 'striker';
-    // Horizontal acceleration
-    const accel = p.grounded ? (isStriker ? 1.1 : 0.8) : (isStriker ? 0.6 : 0.4);
-    const maxSpeed = p.grounded ? (isStriker ? 9.5 : 8) : (isStriker ? 7.5 : 6);
+    // Horizontal acceleration (heavy striker is slower but moves with inertia)
+    const accel = p.grounded ? (isStriker ? 0.6 : 0.8) : (isStriker ? 0.3 : 0.4);
+    const maxSpeed = p.grounded ? (isStriker ? 6.5 : 8) : (isStriker ? 5.0 : 6);
 
     if (inputs.left) {
       p.vx = Math.max(-maxSpeed, p.vx - accel);
@@ -338,12 +339,12 @@ function updatePlayer(id) {
     const jumpPressed = inputs.jump && !prevIn.jump;
     if (jumpPressed) {
       if (p.grounded) {
-        p.vy = isStriker ? -12 : -11;
+        p.vy = isStriker ? -10.0 : -11;
         p.grounded = false;
         p.jumpCount = 1;
         events.push({ type: 'jump', x: p.x, y: p.y, double: false });
       } else if (p.jumpCount < 2) {
-        p.vy = isStriker ? -11.5 : -10.5;
+        p.vy = isStriker ? -9.5 : -10.5;
         p.jumpCount = 2;
         events.push({ type: 'jump', x: p.x, y: p.y, double: true });
       }
@@ -371,13 +372,13 @@ function updatePlayer(id) {
       const isStriker = p.characterType === 'striker';
       p.isAttacking = true;
       p.attackType = 'normal';
-      p.attackFrame = isStriker ? 7 : 10;
-      p.attackCooldown = isStriker ? 12 : 20;
+      p.attackFrame = isStriker ? 12 : 10;
+      p.attackCooldown = isStriker ? 25 : 20;
       p.hitPlayers = [];
 
       // Step-in for striker to close distance
       if (isStriker) {
-        p.vx += p.facing * 3.5;
+        p.vx += p.facing * 2.0;
       }
 
       performAttack(p, 'normal', 0);
@@ -448,9 +449,9 @@ function performAttack(attacker, type, chargeRatio) {
   }
 
   // Striker Character: Perform normal Melee check
-  const aw = type === 'strong' ? 85 : 65;
-  const ah = 45;
-  const ox = attacker.facing * (type === 'strong' ? 45 : 35);
+  const aw = type === 'strong' ? 110 : 85;
+  const ah = type === 'strong' ? 60 : 55;
+  const ox = attacker.facing * (type === 'strong' ? 55 : 45);
 
   const ax1 = attacker.x + ox - aw / 2;
   const ax2 = attacker.x + ox + aw / 2;
@@ -509,12 +510,12 @@ function performAttack(attacker, type, chargeRatio) {
         }
       } else {
         // Normal hit connection
-        const dmg = type === 'strong' ? (12 + chargeRatio * 10) : 7.0;
+        const dmg = type === 'strong' ? (18 + chargeRatio * 12) : 11.0;
         target.damageRate += dmg;
 
         // Knockback physics formula (calibrated to prevent single-hit KOs at low damage)
-        const baseKb = type === 'strong' ? (6.0 + chargeRatio * 4) : 3.2;
-        const scaleKb = type === 'strong' ? 0.14 : 0.06;
+        const baseKb = type === 'strong' ? (7.5 + chargeRatio * 4.5) : 4.2;
+        const scaleKb = type === 'strong' ? 0.18 : 0.08;
         const kbMagnitude = baseKb + (target.damageRate * scaleKb);
 
         // Vector direction: angled slightly upwards
@@ -526,9 +527,10 @@ function performAttack(attacker, type, chargeRatio) {
         dirX /= len;
         dirY /= len;
 
-        // Apply knockback velocities
-        target.vx = kbMagnitude * dirX;
-        target.vy = kbMagnitude * dirY;
+        // Apply knockback velocities (striker has heavier weight and resists 25% knockback)
+        const weightMitigation = target.characterType === 'striker' ? 0.75 : 1.0;
+        target.vx = kbMagnitude * dirX * weightMitigation;
+        target.vy = kbMagnitude * dirY * weightMitigation;
         target.grounded = false;
 
         // Hitstun is proportional to knockback
@@ -710,6 +712,9 @@ function restartMatch() {
     const p = players[id];
     const spawn = getRandomSpawnPoint();
     p.characterType = Math.random() < 0.5 ? 'striker' : 'blaster'; // Re-roll character class
+    const isStriker = p.characterType === 'striker';
+    p.width = isStriker ? 38 : 30;
+    p.height = isStriker ? 69 : 55;
     p.x = spawn.x;
     p.y = spawn.y;
     p.vx = 0;
@@ -817,8 +822,10 @@ function updateProjectiles() {
             dirX /= len;
             dirY /= len;
 
-            target.vx = kbMagnitude * dirX;
-            target.vy = kbMagnitude * dirY;
+            // Apply knockback velocities (striker resists 25% knockback due to weight)
+            const weightMitigation = target.characterType === 'striker' ? 0.75 : 1.0;
+            target.vx = kbMagnitude * dirX * weightMitigation;
+            target.vy = kbMagnitude * dirY * weightMitigation;
             target.grounded = false;
             target.hitStun = Math.round(kbMagnitude * 2.5);
 

@@ -614,6 +614,11 @@ function drawPictogram(ctx, p) {
   ctx.save();
   ctx.translate(p.x, p.y);
   
+  // Scale up heavy striker class
+  if (p.characterType === 'striker') {
+    ctx.scale(1.25, 1.25);
+  }
+  
   // 1. Invulnerable Flash
   if (p.invulnerable && Math.floor(Date.now() / 80) % 2 === 0) {
     ctx.restore();
