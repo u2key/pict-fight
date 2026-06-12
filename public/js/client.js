@@ -1047,18 +1047,7 @@ function drawOffscreenIndicators(ctx) {
 
 // Client Side Game Draw and Animation Loop
 function render() {
-  ctx.save();
-
-  // 1. Apply screen shake effect
-  if (shakeIntensity > 0.1) {
-    const dx = (Math.random() - 0.5) * shakeIntensity;
-    const dy = (Math.random() - 0.5) * shakeIntensity;
-    ctx.translate(dx, dy);
-    shakeIntensity *= 0.9; // decay shake
-  }
-
-  // 2. Clear background and draw glowing digital grid
-  // Slow time-based background transition (shifting space color)
+  // 1. Clear background (static fill, done before translate to prevent edge afterimages)
   const bgTime = Date.now() * 0.0001;
   const bgR = Math.round(12 + Math.sin(bgTime) * 6);
   const bgG = Math.round(15 + Math.cos(bgTime * 0.8) * 6);
@@ -1074,6 +1063,17 @@ function render() {
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // 2. Save context and apply screen shake effect to the game elements
+  ctx.save();
+
+  if (shakeIntensity > 0.1) {
+    const dx = (Math.random() - 0.5) * shakeIntensity;
+    const dy = (Math.random() - 0.5) * shakeIntensity;
+    ctx.translate(dx, dy);
+    shakeIntensity *= 0.9; // decay shake
+  }
+
+  // 2.3 Draw glowing digital grid
   ctx.strokeStyle = 'rgba(255,255,255,0.025)';
   ctx.lineWidth = 1;
   const gridSize = 40;
