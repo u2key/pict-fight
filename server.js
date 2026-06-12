@@ -111,26 +111,20 @@ let nextProjId = 0;         // ID index for projectiles
 let activeStripe = null;    // Active background stripe obstacle
 
 
-// Lobby client tracking for stage selection rights
-const lobbyClients = [];    // Array of player IDs in connection order
-const clientSockets = {};   // Map of playerId -> WebSocket instance
-
 // Function to update stage selection rights for all connected clients
 function updateStageSelectionRights() {
   const gameStarted = Object.keys(players).length > 0;
-  const hostId = lobbyClients[0] || null;
+  const rightsPacket = JSON.stringify({
+    type: 'stage_rights',
+    hasChoice: !gameStarted,
+    currentStageId: currentStageId
+  });
 
-  for (const id of lobbyClients) {
-    const ws = clientSockets[id];
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      const hasChoice = !gameStarted && (id === hostId);
-      ws.send(JSON.stringify({
-        type: 'stage_rights',
-        hasChoice: hasChoice,
-        currentStageId: currentStageId
-      }));
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(rightsPacket);
     }
-  }
+  });
 }
 
 
@@ -224,10 +218,6 @@ wss.on('connection', (ws) => {
   const playerId = 'p_' + Math.random().toString(36).substr(2, 9);
   console.log(`Client connected. Assigning ID: ${playerId}`);
 
-  // Register in lobby management
-  clientSockets[playerId] = ws;
-  lobbyClients.push(playerId);
-
   // Send a welcome packet with client ID and stage configuration
   ws.send(JSON.stringify({
     type: 'welcome',
@@ -269,13 +259,12 @@ wss.on('connection', (ws) => {
         // Lock stage selection because the game has started
         updateStageSelectionRights();
       } else if (data.type === 'select_stage') {
-        const hostId = lobbyClients[0] || null;
         const gameStarted = Object.keys(players).length > 0;
 
-        if (!gameStarted && playerId === hostId && data.stageId && STAGES[data.stageId]) {
+        if (!gameStarted && data.stageId && STAGES[data.stageId]) {
           currentStageId = data.stageId;
           STAGE = STAGES[currentStageId];
-          console.log(`Host ${playerId} updated stage to: ${STAGE.name}`);
+          console.log(`Player ${playerId} updated stage to: ${STAGE.name}`);
 
           // Broadcast stage update to all connected clients
           const stageChangePacket = JSON.stringify({
@@ -348,12 +337,6 @@ wss.on('connection', (ws) => {
     delete clientInputs[playerId];
     delete prevInputs[playerId];
 
-    // Cleanup lobby client tracking
-    delete clientSockets[playerId];
-    const idx = lobbyClients.indexOf(playerId);
-    if (idx !== -1) {
-      lobbyClients.splice(idx, 1);
-    }
     updateStageSelectionRights();
   });
 });
