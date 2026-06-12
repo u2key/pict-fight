@@ -492,6 +492,39 @@ function performAttack(attacker, type, chargeRatio) {
     y: attacker.y - attacker.height / 2
   });
 
+  // Clash/Negate any incoming projectiles inside striker's fist hitbox
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const proj = projectiles[i];
+    if (proj.ownerId === attacker.id) continue;
+
+    const px = proj.x;
+    const py = proj.y;
+    const r = proj.size / 2;
+
+    const px1 = px - r;
+    const px2 = px + r;
+    const py1 = py - r;
+    const py2 = py + r;
+
+    // AABB intersection check
+    const overlapProj = ax1 < px2 && ax2 > px1 && ay1 < py2 && ay2 > py1;
+    if (overlapProj) {
+      events.push({
+        type: 'proj_explode',
+        x: proj.x,
+        y: proj.y,
+        color: proj.color
+      });
+      events.push({
+        type: 'shield_hit',
+        targetId: attacker.id,
+        x: proj.x,
+        y: proj.y
+      });
+      projectiles.splice(i, 1);
+    }
+  }
+
   // Check all potential targets
   for (const id in players) {
     if (id === attacker.id) continue;
