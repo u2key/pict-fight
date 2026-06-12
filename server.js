@@ -664,8 +664,8 @@ function performAttack(attacker, type, chargeRatio) {
     const size = 10 + chargeRatio * 25; // 10 to 35
     const speed = 12 + chargeRatio * 2; // 12 to 14 (fast & heavy)
     const dmg = 3.5 + chargeRatio * 14.5; // 3.5 to 18.0
-    const baseKb = 0.8 + chargeRatio * 5.2; // 0.8 to 6.0
-    const scaleKb = 0.01 + chargeRatio * 0.14; // 0.01 to 0.15
+    const baseKb = 0.8 + chargeRatio * 6.7; // 0.8 to 7.5
+    const scaleKb = 0.01 + chargeRatio * 0.17; // 0.01 to 0.18
     const life = 90 + Math.round(chargeRatio * 60); // 90 to 150
 
     // Broadcast attack swing event for visual client effects (visualize as strong attack if charged)
