@@ -1108,34 +1108,126 @@ function render() {
   if (stageConfig) {
     const main = stageConfig.mainPlatform;
     
-    // Draw Main Platform Shadow Glow
-    ctx.save();
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = '#1e3a8a';
-    ctx.fillStyle = '#1e293b';
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    // Rounded main platform slab
-    ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    if (stageConfig.id === 'baumkuchen') {
+      // Draw Baumkuchen cake slab
+      ctx.save();
+      
+      // Cake Body (layered cake)
+      ctx.fillStyle = '#b45309'; // crust outer outline
+      ctx.beginPath();
+      ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
+      ctx.fill();
+
+      // Cake inside color (warm cake yellow)
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(main.x1 + 4, main.y1 + 4, main.x2 - main.x1 - 8, main.y2 - main.y1 - 8, 6);
+      ctx.clip();
+      ctx.fillStyle = '#f59e0b';
+      ctx.fill();
+
+      // Concentric rings (stripes representing Baumkuchen layers)
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 3;
+      ctx.globalAlpha = 0.22;
+      for (let i = 1; i <= 6; i++) {
+        const yOffset = main.y1 + 4 + (i * 3.5);
+        ctx.beginPath();
+        ctx.moveTo(main.x1, yOffset);
+        ctx.lineTo(main.x2, yOffset);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // White icing frosting top
+      ctx.save();
+      ctx.fillStyle = '#fafaf9'; // white icing
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = '#fafaf9';
+      ctx.beginPath();
+      ctx.roundRect(main.x1, main.y1 - 1, main.x2 - main.x1, 6, 3);
+      ctx.fill();
+      
+      // Dripping icing drops
+      ctx.fillStyle = '#fafaf9';
+      const dripRatios = [0.08, 0.18, 0.26, 0.35, 0.44, 0.52, 0.61, 0.70, 0.79, 0.88, 0.94];
+      dripRatios.forEach(ratio => {
+        const x = main.x1 + (main.x2 - main.x1) * ratio;
+        ctx.beginPath();
+        ctx.arc(x, main.y1 + 5, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.restore();
+    } else {
+      // Draw Standard Main Platform Shadow Glow
+      ctx.save();
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#1e3a8a';
+      ctx.fillStyle = '#1e293b';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      // Rounded main platform slab
+      ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Draw pass-through platforms
     const platformsToDraw = currentGameState.platforms || (stageConfig ? stageConfig.platforms : []);
     platformsToDraw.forEach(plat => {
-      ctx.save();
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = '#f59e0b';
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(plat.x1, plat.y1 !== undefined ? plat.y1 : plat.y);
-      ctx.lineTo(plat.x2, plat.y2 !== undefined ? plat.y2 : plat.y);
-      ctx.stroke();
-      ctx.restore();
+      if (stageConfig.id === 'baumkuchen') {
+        // Draw as a fluffy cloud
+        ctx.save();
+        ctx.shadowBlur = 12;
+        ctx.shadowColor = '#f472b6'; // pink cotton candy glow
+        ctx.fillStyle = '#faf5ff'; // fluffy white cream
+        ctx.strokeStyle = '#fbcfe8'; // pink borders
+        ctx.lineWidth = 2.5;
+
+        const cx = (plat.x1 + plat.x2) / 2;
+        const cy = (plat.y1 + plat.y2) / 2;
+        const length = Math.sqrt(Math.pow(plat.x2 - plat.x1, 2) + Math.pow(plat.y2 - plat.y1, 2));
+        
+        ctx.beginPath();
+        const numPuffs = 5;
+        const puffRadius = 15;
+        
+        // Calculate angle of the platform to align circles correctly
+        const dx = plat.x2 - plat.x1;
+        const dy = plat.y2 - plat.y1;
+        const angle = Math.atan2(dy, dx);
+        
+        // Translate and rotate so we can draw the puffs horizontally
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        
+        // Draw overlapping circles representing cloud puffs
+        for (let i = 0; i < numPuffs; i++) {
+          const t = i / (numPuffs - 1); // 0.0 to 1.0
+          const px = -length / 2 + t * length;
+          const py = -Math.sin(t * Math.PI) * 4;
+          const radius = puffRadius + Math.sin(t * Math.PI) * 4;
+          
+          ctx.arc(px, py, radius, 0, Math.PI * 2);
+        }
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#f59e0b';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 4;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(plat.x1, plat.y1 !== undefined ? plat.y1 : plat.y);
+        ctx.lineTo(plat.x2, plat.y2 !== undefined ? plat.y2 : plat.y);
+        ctx.stroke();
+        ctx.restore();
+      }
     });
   }
 
