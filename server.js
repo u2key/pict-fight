@@ -140,20 +140,50 @@ function updateStagePlatforms() {
   
   STAGE.platforms.forEach(plat => {
     if (plat.isRotating) {
-      let shouldRotate = !plat.rotateOnTouch;
-      
-      // If rotateOnTouch is true, check if any player is standing on it
       if (plat.rotateOnTouch) {
+        // Check if any player is standing on it
+        let anyPlayerOnIt = false;
         for (const id in players) {
           const p = players[id];
           if (p.grounded && p.standingOnPlatId === plat.id) {
-            shouldRotate = true;
+            anyPlayerOnIt = true;
             break;
           }
         }
-      }
-      
-      if (shouldRotate) {
+
+        if (anyPlayerOnIt) {
+          // Rotate forward
+          plat.angle += plat.angularSpeed;
+          if (plat.angle > Math.PI * 2) plat.angle -= Math.PI * 2;
+        } else {
+          // Return to nearest flat orientation (0, Math.PI, or 2*Math.PI)
+          plat.angle = plat.angle % (Math.PI * 2);
+          if (plat.angle < 0) plat.angle += Math.PI * 2;
+
+          let targetAngle = 0;
+          let minD = Math.abs(plat.angle - 0);
+
+          if (Math.abs(plat.angle - Math.PI) < minD) {
+            targetAngle = Math.PI;
+            minD = Math.abs(plat.angle - Math.PI);
+          }
+          if (Math.abs(plat.angle - Math.PI * 2) < minD) {
+            targetAngle = Math.PI * 2;
+            minD = Math.abs(plat.angle - Math.PI * 2);
+          }
+
+          if (minD > plat.angularSpeed) {
+            if (plat.angle < targetAngle) {
+              plat.angle += plat.angularSpeed;
+            } else {
+              plat.angle -= plat.angularSpeed;
+            }
+          } else {
+            plat.angle = targetAngle;
+          }
+        }
+      } else {
+        // Auto-rotate automatically
         plat.angle += plat.angularSpeed;
         if (plat.angle > Math.PI * 2) plat.angle -= Math.PI * 2;
       }
