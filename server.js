@@ -81,6 +81,24 @@ const STAGES = {
       { x: 750, y: 300 },
       { x: 600, y: 200 }
     ]
+  },
+  baumkuchen: {
+    id: 'baumkuchen',
+    name: 'Baumkuchen (ケーキ)',
+    width: 1200,
+    height: 800,
+    mainPlatform: { x1: 300, x2: 900, y1: 500, y2: 530 },
+    platforms: [
+      { id: 'plat_bk1', x1: 220, x2: 470, y: 380, isRotating: false },
+      { id: 'plat_bk2', x1: 730, x2: 980, y: 380, isRotating: false },
+      { id: 'plat_bk3', x: 600, y: 260, length: 180, angle: 0, angularSpeed: 0.015, isRotating: true, rotateOnTouch: false, x1: 510, y1: 260, x2: 690, y2: 260 }
+    ],
+    blastZones: { left: -200, right: 1400, top: -300, bottom: 1000 },
+    spawnPoints: [
+      { x: 400, y: 450 },
+      { x: 800, y: 450 },
+      { x: 600, y: 200 }
+    ]
   }
 };
 

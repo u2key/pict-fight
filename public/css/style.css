@@ -453,9 +453,9 @@ body {
 
 .stage-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
-  max-width: 520px;
+  max-width: 620px;
   margin: 0 auto 16px auto;
 }
 
