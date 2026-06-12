@@ -271,7 +271,7 @@ function updatePlayer(id) {
   if (inputs.shield && p.grounded && !p.isAttacking && !p.isCharging) {
     p.isShielding = true;
     p.vx *= 0.7; // Brake quickly
-    p.shieldHealth -= 0.6; // Drain shield
+    p.shieldHealth -= 0.2; // Drain shield
     if (p.shieldHealth <= 0) {
       p.shieldHealth = 0;
       p.isShielding = false;
@@ -478,11 +478,7 @@ function performAttack(attacker, type, chargeRatio) {
         const shieldDmg = type === 'strong' ? 25 * (1 + chargeRatio) : 12;
         target.shieldHealth -= shieldDmg;
 
-        // Knockback on shield (pushed back slightly)
-        const kbDirX = Math.sign(target.x - attacker.x) || attacker.facing;
-        target.vx = kbDirX * (type === 'strong' ? 6 : 3);
-        target.vy = -1.5;
-        target.grounded = false;
+        // Knockback on shield disabled
 
         events.push({
           type: 'shield_hit',
@@ -782,10 +778,7 @@ function updateProjectiles() {
             const shieldDmg = proj.damage * 1.5;
             target.shieldHealth -= shieldDmg;
 
-            const dirX = Math.sign(proj.vx) || 1;
-            target.vx = dirX * 1.8;
-            target.vy = -0.5;
-            target.grounded = false;
+            // Knockback on shield disabled
 
             events.push({
               type: 'shield_hit',
