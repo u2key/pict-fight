@@ -1109,29 +1109,29 @@ function render() {
     const main = stageConfig.mainPlatform;
     
     if (stageConfig.id === 'baumkuchen') {
-      // Draw Baumkuchen cake slab as a giant rotating semicircle underneath the AABB
+      // Draw Baumkuchen cake as an upward-facing dome above the main platform line
       ctx.save();
       
       const cx = (main.x1 + main.x2) / 2; // 600
-      const cy = main.y1; // 500 (center of semicircle flat top)
-      const radius = 300; // radius of cake
+      const cy = main.y1; // top of platform AABB = flat diameter line
+      const radius = 200; // radius of cake dome
 
-      // Create semicircle clipping path (bottom half of circle)
+      // Create upper semicircle clipping path (dome above the line)
       ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI);
+      ctx.arc(cx, cy, radius, Math.PI, 0); // upper arc
       ctx.closePath();
       ctx.clip();
 
-      // Draw cake base background
-      ctx.fillStyle = '#b45309'; // crust outline color
+      // Draw cake base background (crust)
+      ctx.fillStyle = '#b45309';
       ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI);
+      ctx.arc(cx, cy, radius, Math.PI, 0);
       ctx.fill();
 
       // Cake inside yellow body
       ctx.fillStyle = '#f59e0b';
       ctx.beginPath();
-      ctx.arc(cx, cy, radius - 6, 0, Math.PI);
+      ctx.arc(cx, cy, radius - 6, Math.PI, 0);
       ctx.fill();
 
       // Concentric rings (Baumkuchen layers)
@@ -1140,11 +1140,11 @@ function render() {
       for (let r = 40; r < radius - 6; r += 22) {
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI);
+        ctx.arc(cx, cy, r, Math.PI, 0);
         ctx.stroke();
       }
 
-      // Rotating cake wedges (slices) representing rotation
+      // Rotating cake wedges (slices)
       ctx.save();
       ctx.globalAlpha = 0.18;
       ctx.strokeStyle = '#78350f';
@@ -1165,7 +1165,7 @@ function render() {
       ctx.restore();
       ctx.restore(); // end of clipping
 
-      // Draw white frosting top (flat diameter line icing)
+      // Draw white frosting along the flat bottom diameter line
       ctx.save();
       ctx.fillStyle = '#fafaf9';
       ctx.shadowBlur = 6;
@@ -1174,7 +1174,7 @@ function render() {
       ctx.roundRect(main.x1, main.y1 - 1, main.x2 - main.x1, 6, 3);
       ctx.fill();
 
-      // Dripping icing drops
+      // Dripping icing drops below the diameter
       ctx.fillStyle = '#fafaf9';
       const dripRatios = [0.08, 0.18, 0.26, 0.35, 0.44, 0.52, 0.61, 0.70, 0.79, 0.88, 0.94];
       dripRatios.forEach(ratio => {
