@@ -1109,45 +1109,71 @@ function render() {
     const main = stageConfig.mainPlatform;
     
     if (stageConfig.id === 'baumkuchen') {
-      // Draw Baumkuchen cake slab
+      // Draw Baumkuchen cake slab as a giant rotating semicircle underneath the AABB
       ctx.save();
       
-      // Cake Body (layered cake)
-      ctx.fillStyle = '#b45309'; // crust outer outline
-      ctx.beginPath();
-      ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
-      ctx.fill();
+      const cx = (main.x1 + main.x2) / 2; // 600
+      const cy = main.y1; // 500 (center of semicircle flat top)
+      const radius = 300; // radius of cake
 
-      // Cake inside color (warm cake yellow)
-      ctx.save();
+      // Create semicircle clipping path (bottom half of circle)
       ctx.beginPath();
-      ctx.roundRect(main.x1 + 4, main.y1 + 4, main.x2 - main.x1 - 8, main.y2 - main.y1 - 8, 6);
+      ctx.arc(cx, cy, radius, 0, Math.PI);
+      ctx.closePath();
       ctx.clip();
-      ctx.fillStyle = '#f59e0b';
+
+      // Draw cake base background
+      ctx.fillStyle = '#b45309'; // crust outline color
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius, 0, Math.PI);
       ctx.fill();
 
-      // Concentric rings (stripes representing Baumkuchen layers)
+      // Cake inside yellow body
+      ctx.fillStyle = '#f59e0b';
+      ctx.beginPath();
+      ctx.arc(cx, cy, radius - 6, 0, Math.PI);
+      ctx.fill();
+
+      // Concentric rings (Baumkuchen layers)
       ctx.strokeStyle = '#78350f';
-      ctx.lineWidth = 3;
       ctx.globalAlpha = 0.22;
-      for (let i = 1; i <= 6; i++) {
-        const yOffset = main.y1 + 4 + (i * 3.5);
+      for (let r = 40; r < radius - 6; r += 22) {
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(main.x1, yOffset);
-        ctx.lineTo(main.x2, yOffset);
+        ctx.arc(cx, cy, r, 0, Math.PI);
+        ctx.stroke();
+      }
+
+      // Rotating cake wedges (slices) representing rotation
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = '#78350f';
+      ctx.lineWidth = 5;
+      
+      // Calculate rotation angle matching physical push speed
+      const rotAngle = (Date.now() * 0.00012) % (Math.PI * 2);
+      ctx.translate(cx, cy);
+      ctx.rotate(rotAngle);
+      
+      // Draw 12 spoke lines representing cake slices
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(a) * radius, Math.sin(a) * radius);
         ctx.stroke();
       }
       ctx.restore();
+      ctx.restore(); // end of clipping
 
-      // White icing frosting top
+      // Draw white frosting top (flat diameter line icing)
       ctx.save();
-      ctx.fillStyle = '#fafaf9'; // white icing
+      ctx.fillStyle = '#fafaf9';
       ctx.shadowBlur = 6;
       ctx.shadowColor = '#fafaf9';
       ctx.beginPath();
       ctx.roundRect(main.x1, main.y1 - 1, main.x2 - main.x1, 6, 3);
       ctx.fill();
-      
+
       // Dripping icing drops
       ctx.fillStyle = '#fafaf9';
       const dripRatios = [0.08, 0.18, 0.26, 0.35, 0.44, 0.52, 0.61, 0.70, 0.79, 0.88, 0.94];
@@ -1158,7 +1184,6 @@ function render() {
         ctx.fill();
       });
       ctx.restore();
-      ctx.restore(); // Restore outer save state for the Baumkuchen block
     } else if (stageConfig.id === 'battlefield') {
       // Battlefield: Grassy stone slab
       ctx.save();

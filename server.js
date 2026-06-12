@@ -575,6 +575,12 @@ function updatePlayer(id) {
       if (Math.abs(p.vx) < 0.05) p.vx = 0;
     }
 
+    // Apply conveyor terrain effect for Baumkuchen stage main platform
+    if (STAGE && STAGE.id === 'baumkuchen' && p.grounded && !p.standingOnPlatId) {
+      const conveyorSpeed = 0.6;
+      p.vx = Math.min(maxSpeed, Math.max(-maxSpeed, p.vx + conveyorSpeed));
+    }
+
     // Gravity
     p.vy += 0.4;
     p.vy = Math.min(p.vy, 15); // Terminal velocity
