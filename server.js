@@ -292,12 +292,18 @@ function updatePlayer(id) {
     p.vx *= 0.8; // Friction deceleration while charging
   } else if (p.isCharging && !inputs.strongAttack) {
     // Release Strong Attack!
+    const isStriker = p.characterType === 'striker';
     p.isCharging = false;
     p.isAttacking = true;
     p.attackType = 'strong';
-    p.attackFrame = 15;
-    p.attackCooldown = 35;
+    p.attackFrame = isStriker ? 12 : 15;
+    p.attackCooldown = isStriker ? 22 : 35;
     p.hitPlayers = [];
+
+    // Step-in for striker to close distance
+    if (isStriker) {
+      p.vx += p.facing * 5.0;
+    }
 
     // Spawn strike event immediately
     const chargeRatio = p.chargeTime / 60.0;
@@ -306,9 +312,10 @@ function updatePlayer(id) {
 
   // 6. Normal Movement and Normal Attacks (if not shielding/charging)
   if (!p.isShielding && !p.isCharging) {
+    const isStriker = p.characterType === 'striker';
     // Horizontal acceleration
-    const accel = p.grounded ? 0.8 : 0.4;
-    const maxSpeed = p.grounded ? 8 : 6;
+    const accel = p.grounded ? (isStriker ? 1.1 : 0.8) : (isStriker ? 0.6 : 0.4);
+    const maxSpeed = p.grounded ? (isStriker ? 9.5 : 8) : (isStriker ? 7.5 : 6);
 
     if (inputs.left) {
       p.vx = Math.max(-maxSpeed, p.vx - accel);
@@ -331,12 +338,12 @@ function updatePlayer(id) {
     const jumpPressed = inputs.jump && !prevIn.jump;
     if (jumpPressed) {
       if (p.grounded) {
-        p.vy = -11;
+        p.vy = isStriker ? -12 : -11;
         p.grounded = false;
         p.jumpCount = 1;
         events.push({ type: 'jump', x: p.x, y: p.y, double: false });
       } else if (p.jumpCount < 2) {
-        p.vy = -10.5;
+        p.vy = isStriker ? -11.5 : -10.5;
         p.jumpCount = 2;
         events.push({ type: 'jump', x: p.x, y: p.y, double: true });
       }
@@ -361,11 +368,17 @@ function updatePlayer(id) {
 
     // Execute Normal Attack
     if (inputs.attack && !prevIn.attack && p.attackCooldown === 0 && !p.isAttacking) {
+      const isStriker = p.characterType === 'striker';
       p.isAttacking = true;
       p.attackType = 'normal';
-      p.attackFrame = 10;
-      p.attackCooldown = 20;
+      p.attackFrame = isStriker ? 7 : 10;
+      p.attackCooldown = isStriker ? 12 : 20;
       p.hitPlayers = [];
+
+      // Step-in for striker to close distance
+      if (isStriker) {
+        p.vx += p.facing * 3.5;
+      }
 
       performAttack(p, 'normal', 0);
     }
@@ -435,9 +448,9 @@ function performAttack(attacker, type, chargeRatio) {
   }
 
   // Striker Character: Perform normal Melee check
-  const aw = type === 'strong' ? 70 : 55;
-  const ah = 40;
-  const ox = attacker.facing * (type === 'strong' ? 40 : 30);
+  const aw = type === 'strong' ? 85 : 65;
+  const ah = 45;
+  const ox = attacker.facing * (type === 'strong' ? 45 : 35);
 
   const ax1 = attacker.x + ox - aw / 2;
   const ax2 = attacker.x + ox + aw / 2;
@@ -496,12 +509,12 @@ function performAttack(attacker, type, chargeRatio) {
         }
       } else {
         // Normal hit connection
-        const dmg = type === 'strong' ? (10 + chargeRatio * 8) : 5.5;
+        const dmg = type === 'strong' ? (12 + chargeRatio * 10) : 7.0;
         target.damageRate += dmg;
 
         // Knockback physics formula (calibrated to prevent single-hit KOs at low damage)
-        const baseKb = type === 'strong' ? (5.0 + chargeRatio * 4) : 2.5;
-        const scaleKb = type === 'strong' ? 0.12 : 0.05;
+        const baseKb = type === 'strong' ? (6.0 + chargeRatio * 4) : 3.2;
+        const scaleKb = type === 'strong' ? 0.14 : 0.06;
         const kbMagnitude = baseKb + (target.damageRate * scaleKb);
 
         // Vector direction: angled slightly upwards
