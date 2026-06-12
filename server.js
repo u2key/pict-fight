@@ -327,31 +327,7 @@ wss.on('connection', (ws) => {
         }
       } else if (data.type === 'force_reset') {
         console.log(`Force reset triggered by player ${playerId}`);
-
-        // Clear all players from the arena
-        for (const key in players) {
-          delete players[key];
-        }
-
-        // Clear projectiles and match state
-        projectiles = [];
-        events = [];
-        activeStripe = null;
-        matchState = 'playing';
-        matchWinner = null;
-
-        // Broadcast reset_lobby to all clients to return them to the lobby
-        const resetPacket = JSON.stringify({
-          type: 'reset_lobby'
-        });
-        wss.clients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(resetPacket);
-          }
-        });
-
-        // Update rights (unlock choice for host)
-        updateStageSelectionRights();
+        returnToLobby();
       } else if (data.type === 'input') {
         // Update input buffer
         if (clientInputs[playerId]) {
@@ -1031,41 +1007,33 @@ function checkMatchEnd() {
   }
 }
 
-// Restart match state for next round
-function restartMatch() {
-  matchState = 'playing';
-  matchWinner = null;
-  projectiles = []; // Clear active projectiles
-
-  for (const id in players) {
-    const p = players[id];
-    const spawn = getRandomSpawnPoint();
-    p.characterType = Math.random() < 0.5 ? 'striker' : 'blaster'; // Re-roll character class
-    const isStriker = p.characterType === 'striker';
-    p.width = isStriker ? 38 : 30;
-    p.height = isStriker ? 69 : 55;
-    p.x = spawn.x;
-    p.y = spawn.y;
-    p.vx = 0;
-    p.vy = 0;
-    p.damageRate = 0;
-    p.stocks = 3;
-    p.isEliminated = false;
-    p.respawnTimer = 0;
-    p.invulnerableTimer = 120;
-    p.grounded = false;
-    p.standingOnPlatId = null;
-    p.jumpCount = 0;
-    p.isAttacking = false;
-    p.isCharging = false;
-    p.chargeTime = 0;
-    p.hitStun = 0;
-    p.shieldStun = 0;
-    p.shieldHealth = 100;
+// Return all players to the lobby and reset game state
+function returnToLobby() {
+  // Clear all players from the arena
+  for (const key in players) {
+    delete players[key];
   }
 
-  events.push({ type: 'match_start' });
-  console.log('Match restarted.');
+  // Clear projectiles and match state
+  projectiles = [];
+  events = [];
+  activeStripe = null;
+  matchState = 'playing';
+  matchWinner = null;
+
+  // Broadcast reset_lobby to all clients to return them to the lobby
+  const resetPacket = JSON.stringify({
+    type: 'reset_lobby'
+  });
+  wss.clients.forEach(client => {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(resetPacket);
+    }
+  });
+
+  // Update rights (unlock choice for everyone now that game has ended)
+  updateStageSelectionRights();
+  console.log('Returned all players to lobby and reset state.');
 }
 
 // Update all active projectiles
@@ -1192,7 +1160,7 @@ function gameLoop() {
     if (matchState === 'ended') {
       matchEndTimer--;
       if (matchEndTimer <= 0) {
-        restartMatch();
+        returnToLobby();
       }
     }
 
