@@ -1159,8 +1159,143 @@ function render() {
       });
       ctx.restore();
       ctx.restore(); // Restore outer save state for the Baumkuchen block
+    } else if (stageConfig.id === 'battlefield') {
+      // Battlefield: Grassy stone slab
+      ctx.save();
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#1e293b';
+
+      // 1. Stone Base
+      ctx.fillStyle = '#475569';
+      ctx.strokeStyle = '#334155';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // Stone cracks / textures
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(main.x1 + 100, main.y1 + 6); ctx.lineTo(main.x1 + 105, main.y1 + 15); ctx.lineTo(main.x1 + 95, main.y1 + 24);
+      ctx.moveTo(main.x2 - 150, main.y1 + 8); ctx.lineTo(main.x2 - 140, main.y1 + 22);
+      ctx.stroke();
+
+      // 2. Grassy Top Layer
+      ctx.fillStyle = '#16a34a'; // Grass green
+      ctx.beginPath();
+      ctx.roundRect(main.x1 + 2, main.y1 + 2, main.x2 - main.x1 - 4, 8, [6, 6, 0, 0]);
+      ctx.fill();
+
+      // Grass blades
+      ctx.strokeStyle = '#16a34a';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      for (let x = main.x1 + 12; x < main.x2 - 12; x += 22) {
+        ctx.moveTo(x, main.y1 + 2);
+        ctx.lineTo(x - 2, main.y1 - 3);
+        ctx.moveTo(x + 5, main.y1 + 2);
+        ctx.lineTo(x + 7, main.y1 - 4);
+      }
+      ctx.stroke();
+      ctx.restore();
+    } else if (stageConfig.id === 'final_destination') {
+      // Final Destination: Obsidian neon crystal
+      ctx.save();
+      ctx.shadowBlur = 18;
+      ctx.shadowColor = '#d946ef'; // Magenta glow
+
+      // Dark obsidian crystal body
+      ctx.fillStyle = '#0f172a';
+      ctx.strokeStyle = '#d946ef'; // Magenta outline
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // Cyan neon energy core stripe
+      ctx.strokeStyle = '#06b6d4';
+      ctx.lineWidth = 2.5;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = '#06b6d4';
+      ctx.beginPath();
+      ctx.moveTo(main.x1 + 40, main.y1 + 15);
+      ctx.lineTo(main.x2 - 40, main.y1 + 15);
+      ctx.stroke();
+      ctx.restore();
+    } else if (stageConfig.id === 'dream_land') {
+      // Dream Land: Pastel soil & flowers
+      ctx.save();
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#4c0519';
+
+      // Brown soil base
+      ctx.fillStyle = '#7c2d12';
+      ctx.strokeStyle = '#4c0519';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // Grass top layer
+      ctx.fillStyle = '#84cc16'; // Lime green
+      ctx.beginPath();
+      ctx.roundRect(main.x1 + 2, main.y1 + 2, main.x2 - main.x1 - 4, 8, [6, 6, 0, 0]);
+      ctx.fill();
+
+      // Draw small pink flowers on grass
+      ctx.fillStyle = '#ec4899';
+      const flowerPositions = [0.15, 0.35, 0.5, 0.65, 0.85];
+      flowerPositions.forEach(ratio => {
+        const x = main.x1 + (main.x2 - main.x1) * ratio;
+        ctx.beginPath();
+        ctx.arc(x, main.y1, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, main.y1, 1.0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ec4899';
+      });
+      ctx.restore();
+    } else if (stageConfig.id === 'rotating_ruins') {
+      // Rotating Ruins: Ancient mossy stone block
+      ctx.save();
+      ctx.shadowBlur = 12;
+      ctx.shadowColor = '#1e293b';
+
+      // Mossy stone base
+      ctx.fillStyle = '#334155';
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
+      ctx.fill();
+      ctx.stroke();
+
+      // Green moss patches
+      ctx.fillStyle = '#15803d';
+      ctx.beginPath();
+      ctx.roundRect(main.x1 + 20, main.y1 + 2, 80, 6, 3);
+      ctx.roundRect(main.x1 + 200, main.y1 + 2, 120, 7, 3);
+      ctx.roundRect(main.x2 - 180, main.y1 + 2, 90, 6, 3);
+      ctx.fill();
+
+      // Glowing blue runes
+      ctx.strokeStyle = '#06b6d4';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#06b6d4';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(main.x1 + 120, main.y1 + 15); ctx.lineTo(main.x1 + 130, main.y1 + 10); ctx.lineTo(main.x1 + 135, main.y1 + 22);
+      ctx.moveTo(main.x2 - 250, main.y1 + 12); ctx.lineTo(main.x2 - 240, main.y1 + 20); ctx.lineTo(main.x2 - 245, main.y1 + 15);
+      ctx.stroke();
+      ctx.restore();
     } else {
-      // Draw Standard Main Platform Shadow Glow
+      // Draw Standard Main Platform Shadow Glow (Fallback)
       ctx.save();
       ctx.shadowBlur = 15;
       ctx.shadowColor = '#1e3a8a';
@@ -1168,7 +1303,6 @@ function render() {
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 3;
       ctx.beginPath();
-      // Rounded main platform slab
       ctx.roundRect(main.x1, main.y1, main.x2 - main.x1, main.y2 - main.y1, 8);
       ctx.fill();
       ctx.stroke();
@@ -1216,7 +1350,115 @@ function render() {
         ctx.fill();
         ctx.stroke();
         ctx.restore();
+      } else if (stageConfig.id === 'battlefield') {
+        // Battlefield: Mossy stone platform slabs
+        ctx.save();
+        ctx.shadowBlur = 6;
+        ctx.shadowColor = '#475569';
+        
+        const cx = (plat.x1 + plat.x2) / 2;
+        const cy = (plat.y1 + plat.y2) / 2;
+        const length = Math.sqrt(Math.pow(plat.x2 - plat.x1, 2) + Math.pow(plat.y2 - plat.y1, 2));
+        const dx = plat.x2 - plat.x1;
+        const dy = plat.y2 - plat.y1;
+        const angle = Math.atan2(dy, dx);
+        
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        
+        // Draw stone slab rectangle
+        ctx.fillStyle = '#64748b'; // stone grey
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(-length / 2, -6, length, 12, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Moss top
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.roundRect(-length / 2 + 2, -6, length - 4, 3, [2, 2, 0, 0]);
+        ctx.fill();
+
+        ctx.restore();
+      } else if (stageConfig.id === 'dream_land') {
+        // Dream Land: Log platforms
+        ctx.save();
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#b45309';
+        
+        const cx = (plat.x1 + plat.x2) / 2;
+        const cy = (plat.y1 + plat.y2) / 2;
+        const length = Math.sqrt(Math.pow(plat.x2 - plat.x1, 2) + Math.pow(plat.y2 - plat.y1, 2));
+        const dx = plat.x2 - plat.x1;
+        const dy = plat.y2 - plat.y1;
+        const angle = Math.atan2(dy, dx);
+        
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        
+        // Log base
+        ctx.fillStyle = '#d97706'; // wood brown
+        ctx.strokeStyle = '#7c2d12';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(-length / 2, -5, length, 10, 5);
+        ctx.fill();
+        ctx.stroke();
+
+        // Log rings / lines
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let x = -length / 2 + 15; x < length / 2 - 10; x += 25) {
+          ctx.moveTo(x, -5); ctx.lineTo(x + 5, 5);
+        }
+        ctx.stroke();
+
+        ctx.restore();
+      } else if (stageConfig.id === 'rotating_ruins') {
+        // Rotating Ruins: Ancient runic mossy slabs (rotate with angle)
+        ctx.save();
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#06b6d4';
+        
+        const cx = (plat.x1 + plat.x2) / 2;
+        const cy = (plat.y1 + plat.y2) / 2;
+        const length = Math.sqrt(Math.pow(plat.x2 - plat.x1, 2) + Math.pow(plat.y2 - plat.y1, 2));
+        const dx = plat.x2 - plat.x1;
+        const dy = plat.y2 - plat.y1;
+        const angle = Math.atan2(dy, dx);
+        
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
+        
+        // Mossy stone slab
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = '#1e293b';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.roundRect(-length / 2, -7, length, 14, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Moss spots
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.roundRect(-length / 2 + 10, -7, 30, 3, 1.5);
+        ctx.roundRect(length / 2 - 40, -7, 25, 3, 1.5);
+        ctx.fill();
+
+        // Small rune mark
+        ctx.strokeStyle = '#06b6d4';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-5, -2); ctx.lineTo(0, 3); ctx.lineTo(5, -2);
+        ctx.stroke();
+
+        ctx.restore();
       } else {
+        // Draw Standard platforms (Fallback / final_destination energy lines)
         ctx.save();
         ctx.shadowBlur = 10;
         ctx.shadowColor = '#f59e0b';
