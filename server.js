@@ -286,29 +286,53 @@ function updatePlayer(id) {
     }
   }
 
-  // 5. Strong Attack Charging Action
-  if (inputs.strongAttack && p.grounded && !p.isAttacking && !p.isShielding) {
-    p.isCharging = true;
-    p.chargeTime = Math.min(p.chargeTime + 1, 60); // Charge up to 60 ticks (1s)
-    p.vx *= 0.8; // Friction deceleration while charging
-  } else if (p.isCharging && !inputs.strongAttack) {
-    // Release Strong Attack!
-    const isStriker = p.characterType === 'striker';
-    p.isCharging = false;
-    p.isAttacking = true;
-    p.attackType = 'strong';
-    p.attackFrame = isStriker ? 20 : 15;
-    p.attackCooldown = isStriker ? 45 : 35;
-    p.hitPlayers = [];
+  const isStriker = p.characterType === 'striker';
+  const isBlaster = p.characterType === 'blaster';
 
-    // Step-in for striker to close distance (slightly heavier step)
-    if (isStriker) {
+  // 5. Charging Action
+  if (isStriker) {
+    // Striker (Heavy Melee) uses strongAttack (X key) on ground
+    if (inputs.strongAttack && p.grounded && !p.isAttacking && !p.isShielding) {
+      p.isCharging = true;
+      p.chargeTime = Math.min(p.chargeTime + 1, 60);
+      p.vx *= 0.8;
+    } else if (p.isCharging && !inputs.strongAttack) {
+      // Release Striker Strong Attack!
+      p.isCharging = false;
+      p.isAttacking = true;
+      p.attackType = 'strong';
+      p.attackFrame = 20;
+      p.attackCooldown = 45;
+      p.hitPlayers = [];
+
+      // Step-in for striker to close distance
       p.vx += p.facing * 3.5;
-    }
 
-    // Spawn strike event immediately
-    const chargeRatio = p.chargeTime / 60.0;
-    performAttack(p, 'strong', chargeRatio);
+      const chargeRatio = p.chargeTime / 60.0;
+      performAttack(p, 'strong', chargeRatio);
+      p.chargeTime = 0;
+    }
+  } else if (isBlaster) {
+    // Blaster (Ranged) uses attack (Z key) for charging, works in mid-air too!
+    if (inputs.attack && !p.isAttacking && !p.isShielding) {
+      p.isCharging = true;
+      p.chargeTime = Math.min(p.chargeTime + 1, 60);
+      if (p.grounded) {
+        p.vx *= 0.8;
+      }
+    } else if (p.isCharging && !inputs.attack) {
+      // Release Blaster Charge Attack!
+      p.isCharging = false;
+      p.isAttacking = true;
+      p.attackType = p.chargeTime >= 20 ? 'strong' : 'normal'; // visually strong if charged a bit
+      p.attackFrame = 10;
+      p.attackCooldown = 0; // Cooldown disabled for normal/charged attack
+      p.hitPlayers = [];
+
+      const chargeRatio = p.chargeTime / 60.0;
+      performAttack(p, 'normal', chargeRatio);
+      p.chargeTime = 0;
+    }
   }
 
   // 6. Normal Movement and Normal Attacks (if not shielding/charging)
@@ -367,19 +391,16 @@ function updatePlayer(id) {
     // Cooldown decrement
     if (p.attackCooldown > 0) p.attackCooldown--;
 
-    // Execute Normal Attack
-    if (inputs.attack && !prevIn.attack && p.attackCooldown === 0 && !p.isAttacking) {
-      const isStriker = p.characterType === 'striker';
+    // Execute Normal Attack (Striker only. Blaster attack is handled on release)
+    if (isStriker && inputs.attack && !prevIn.attack && p.attackCooldown === 0 && !p.isAttacking) {
       p.isAttacking = true;
       p.attackType = 'normal';
-      p.attackFrame = isStriker ? 12 : 10;
+      p.attackFrame = 12;
       p.attackCooldown = 0; // Cooldown disabled for normal attack
       p.hitPlayers = [];
 
       // Step-in for striker to close distance
-      if (isStriker) {
-        p.vx += p.facing * 2.0;
-      }
+      p.vx += p.facing * 2.0;
 
       performAttack(p, 'normal', 0);
     }
@@ -413,17 +434,19 @@ function updatePlayer(id) {
 function performAttack(attacker, type, chargeRatio) {
   if (attacker.characterType === 'blaster') {
     // Blaster Character: Spawn Projectile instead of Melee check
-    const size = type === 'strong' ? (12 + chargeRatio * 18) : 10;
-    const speed = type === 'strong' ? (10 - chargeRatio * 4) : 12;
-    const dmg = type === 'strong' ? (6.5 + chargeRatio * 6.5) : 3.5;
-    const baseKb = type === 'strong' ? (2.0 + chargeRatio * 3.0) : 0.8;
-    const scaleKb = type === 'strong' ? (0.04 + chargeRatio * 0.04) : 0.01;
+    // Now normal attack ('normal') triggers charge behavior based on chargeRatio
+    const size = 10 + chargeRatio * 25; // 10 to 35
+    const speed = 12 + chargeRatio * 2; // 12 to 14 (fast & heavy)
+    const dmg = 3.5 + chargeRatio * 14.5; // 3.5 to 18.0
+    const baseKb = 0.8 + chargeRatio * 5.2; // 0.8 to 6.0
+    const scaleKb = 0.01 + chargeRatio * 0.14; // 0.01 to 0.15
+    const life = 90 + Math.round(chargeRatio * 60); // 90 to 150
 
-    // Broadcast attack swing event for visual client effects
+    // Broadcast attack swing event for visual client effects (visualize as strong attack if charged)
     events.push({
       type: 'attack_swing',
       id: attacker.id,
-      attackType: type,
+      attackType: chargeRatio >= 0.33 ? 'strong' : 'normal',
       chargeRatio,
       facing: attacker.facing,
       x: attacker.x,
@@ -442,7 +465,7 @@ function performAttack(attacker, type, chargeRatio) {
       baseKb: baseKb,
       scaleKb: scaleKb,
       color: attacker.color,
-      life: type === 'strong' ? 120 : 90
+      life: life
     };
     projectiles.push(proj);
     return;
