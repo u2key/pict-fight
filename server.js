@@ -109,6 +109,29 @@ let matchWinner = null;     // Winner details
 let projectiles = [];       // Active projectiles list
 let nextProjId = 0;         // ID index for projectiles
 
+// Lobby client tracking for stage selection rights
+const lobbyClients = [];    // Array of player IDs in connection order
+const clientSockets = {};   // Map of playerId -> WebSocket instance
+
+// Function to update stage selection rights for all connected clients
+function updateStageSelectionRights() {
+  const gameStarted = Object.keys(players).length > 0;
+  const hostId = lobbyClients[0] || null;
+
+  for (const id of lobbyClients) {
+    const ws = clientSockets[id];
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      const hasChoice = !gameStarted && (id === hostId);
+      ws.send(JSON.stringify({
+        type: 'stage_rights',
+        hasChoice: hasChoice,
+        currentStageId: currentStageId
+      }));
+    }
+  }
+}
+
+
 // Helper to get a random spawn point
 function getRandomSpawnPoint() {
   const points = STAGE.spawnPoints;
@@ -199,12 +222,19 @@ wss.on('connection', (ws) => {
   const playerId = 'p_' + Math.random().toString(36).substr(2, 9);
   console.log(`Client connected. Assigning ID: ${playerId}`);
 
+  // Register in lobby management
+  clientSockets[playerId] = ws;
+  lobbyClients.push(playerId);
+
   // Send a welcome packet with client ID and stage configuration
   ws.send(JSON.stringify({
     type: 'welcome',
     id: playerId,
     stage: STAGE
   }));
+
+  // Update stage selection rights for all connected clients
+  updateStageSelectionRights();
 
   // Setup empty inputs
   clientInputs[playerId] = {
@@ -223,13 +253,28 @@ wss.on('connection', (ws) => {
       const data = JSON.parse(message);
 
       if (data.type === 'join') {
-        // If this is the FIRST active player joining, update stage to their selection
-        const activeCount = Object.keys(players).filter(id => !players[id].isEliminated).length;
-        if (activeCount === 0 && data.stageId && STAGES[data.stageId]) {
+        // Player joins the arena
+        players[playerId] = createPlayer(playerId, data.name);
+        events.push({
+          type: 'join',
+          name: players[playerId].name,
+          color: players[playerId].color,
+          x: players[playerId].x,
+          y: players[playerId].y
+        });
+        console.log(`${players[playerId].name} joined the game.`);
+
+        // Lock stage selection because the game has started
+        updateStageSelectionRights();
+      } else if (data.type === 'select_stage') {
+        const hostId = lobbyClients[0] || null;
+        const gameStarted = Object.keys(players).length > 0;
+
+        if (!gameStarted && playerId === hostId && data.stageId && STAGES[data.stageId]) {
           currentStageId = data.stageId;
           STAGE = STAGES[currentStageId];
-          console.log(`Setting stage to: ${STAGE.name}`);
-          
+          console.log(`Host ${playerId} updated stage to: ${STAGE.name}`);
+
           // Broadcast stage update to all connected clients
           const stageChangePacket = JSON.stringify({
             type: 'stage_change',
@@ -241,17 +286,32 @@ wss.on('connection', (ws) => {
             }
           });
         }
+      } else if (data.type === 'force_reset') {
+        console.log(`Force reset triggered by player ${playerId}`);
 
-        // Player joins the arena
-        players[playerId] = createPlayer(playerId, data.name);
-        events.push({
-          type: 'join',
-          name: players[playerId].name,
-          color: players[playerId].color,
-          x: players[playerId].x,
-          y: players[playerId].y
+        // Clear all players from the arena
+        for (const key in players) {
+          delete players[key];
+        }
+
+        // Clear projectiles and match state
+        projectiles = [];
+        events = [];
+        matchState = 'playing';
+        matchWinner = null;
+
+        // Broadcast reset_lobby to all clients to return them to the lobby
+        const resetPacket = JSON.stringify({
+          type: 'reset_lobby'
         });
-        console.log(`${players[playerId].name} joined the game.`);
+        wss.clients.forEach(client => {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(resetPacket);
+          }
+        });
+
+        // Update rights (unlock choice for host)
+        updateStageSelectionRights();
       } else if (data.type === 'input') {
         // Update input buffer
         if (clientInputs[playerId]) {
@@ -284,6 +344,14 @@ wss.on('connection', (ws) => {
     }
     delete clientInputs[playerId];
     delete prevInputs[playerId];
+
+    // Cleanup lobby client tracking
+    delete clientSockets[playerId];
+    const idx = lobbyClients.indexOf(playerId);
+    if (idx !== -1) {
+      lobbyClients.splice(idx, 1);
+    }
+    updateStageSelectionRights();
   });
 });
 

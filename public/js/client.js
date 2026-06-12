@@ -445,6 +445,20 @@ ws.onmessage = (message) => {
     } else if (data.type === 'stage_change') {
       stageConfig = data.stage;
       console.log('Stage changed dynamically to:', stageConfig.name);
+      const radio = document.querySelector(`input[name="stage_select"][value="${stageConfig.id}"]`);
+      if (radio) radio.checked = true;
+    } else if (data.type === 'stage_rights') {
+      const radios = document.querySelectorAll('input[name="stage_select"]');
+      radios.forEach(r => {
+        r.disabled = !data.hasChoice;
+      });
+      const currentRadio = document.querySelector(`input[name="stage_select"][value="${data.currentStageId}"]`);
+      if (currentRadio) currentRadio.checked = true;
+    } else if (data.type === 'reset_lobby') {
+      console.log('Game forced reset. Returning to lobby.');
+      arenaPanel.classList.add('hidden');
+      lobbyPanel.classList.remove('hidden');
+      currentGameState = { players: [] };
     } else if (data.type === 'state') {
       currentGameState = data;
       
@@ -619,6 +633,30 @@ joinForm.addEventListener('submit', () => {
     setupInputListeners();
   }
 });
+
+// Stage change selection sender (for host)
+document.querySelectorAll('input[name="stage_select"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    if (e.target.checked) {
+      ws.send(JSON.stringify({
+        type: 'select_stage',
+        stageId: e.target.value
+      }));
+    }
+  });
+});
+
+// Force Reset Button Handler
+const btnForceReset = document.getElementById('btn-force-reset');
+if (btnForceReset) {
+  btnForceReset.addEventListener('click', () => {
+    if (confirm('ゲームを強制終了し、全員をロビーに戻しますか？')) {
+      ws.send(JSON.stringify({
+        type: 'force_reset'
+      }));
+    }
+  });
+}
 
 // Canvas Drawing function for Pictogram Sticks
 function drawPictogram(ctx, p) {
