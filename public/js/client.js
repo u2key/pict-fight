@@ -1114,7 +1114,7 @@ function render() {
       
       const cx = (main.x1 + main.x2) / 2; // 600
       const cy = main.y1; // top of platform AABB = flat diameter line
-      const radius = 200; // radius of cake dome
+      const radius = 300; // radius of cake dome
 
       // Create upper semicircle clipping path (dome above the line)
       ctx.beginPath();

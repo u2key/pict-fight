@@ -838,8 +838,18 @@ function resolveCollisions(p, inputs) {
   // 1. Solid Main Platform Collision
   const rx1 = STAGE.mainPlatform.x1;
   const rx2 = STAGE.mainPlatform.x2;
-  const ry1 = STAGE.mainPlatform.y1;
+  let ry1 = STAGE.mainPlatform.y1;
   const ry2 = STAGE.mainPlatform.y2;
+
+  // If Baumkuchen, the main platform is a semicircle curve
+  if (STAGE.id === 'baumkuchen') {
+    const cx = (rx1 + rx2) / 2;
+    const radius = (rx2 - rx1) / 2;
+    const dx = Math.abs(p.x - cx);
+    if (dx <= radius) {
+      ry1 = STAGE.mainPlatform.y1 - Math.sqrt(radius * radius - dx * dx);
+    }
+  }
 
   const px1 = p.x - p.width / 2;
   const px2 = p.x + p.width / 2;
@@ -854,7 +864,7 @@ function resolveCollisions(p, inputs) {
     const prev_py1 = p.prevY - p.height;
     const prev_py2 = p.prevY;
 
-    if (prev_py2 <= ry1) {
+    if (prev_py2 <= ry1 + 25 || (Math.abs(p.y - ry1) < 25 && p.vy >= 0)) {
       // Landed on platform top
       p.y = ry1;
       p.vy = 0;
