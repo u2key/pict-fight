@@ -431,3 +431,90 @@ body {
     text-align: center;
   }
 }
+
+/* Stage Selector Styling */
+.stage-selector-section {
+  margin-top: 30px;
+  margin-bottom: 30px;
+  text-align: left;
+}
+
+.stage-selector-section h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 15px;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  border-left: 3px solid var(--accent-cyan);
+  padding-left: 10px;
+}
+
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stage-card {
+  cursor: pointer;
+  position: relative;
+}
+
+.stage-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.stage-card-content {
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.stage-card-content img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.5s ease;
+}
+
+.stage-name {
+  padding: 12px 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+/* Hover effects */
+.stage-card:hover .stage-card-content {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.stage-card:hover img {
+  transform: scale(1.05);
+}
+
+/* Selected state styling */
+.stage-card input[type="radio"]:checked + .stage-card-content {
+  border-color: var(--accent-cyan);
+  background: rgba(6, 182, 212, 0.08);
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.25);
+}
+
+.stage-card input[type="radio"]:checked + .stage-card-content .stage-name {
+  color: var(--accent-cyan);
+}

@@ -14,28 +14,61 @@ app.use(express.static(path.join(__dirname, 'public')));
 const TICK_RATE = 60;
 const TICK_TIME = 1000 / TICK_RATE;
 
-const STAGE = {
-  width: 1200,
-  height: 800,
-  mainPlatform: { x1: 300, x2: 900, y1: 500, y2: 530 },
-  platforms: [
-    { x1: 350, x2: 550, y: 390 }, // Left semi-solid platform
-    { x1: 650, x2: 850, y: 390 }, // Right semi-solid platform
-    { x1: 500, x2: 700, y: 280 }  // Top semi-solid platform
-  ],
-  blastZones: {
-    left: -200,
-    right: 1400,
-    top: -300,
-    bottom: 1000
+const STAGES = {
+  battlefield: {
+    id: 'battlefield',
+    name: 'Battlefield (戦場)',
+    width: 1200,
+    height: 800,
+    mainPlatform: { x1: 300, x2: 900, y1: 500, y2: 530 },
+    platforms: [
+      { x1: 350, x2: 550, y: 390 },
+      { x1: 650, x2: 850, y: 390 },
+      { x1: 500, x2: 700, y: 280 }
+    ],
+    blastZones: { left: -200, right: 1400, top: -300, bottom: 1000 },
+    spawnPoints: [
+      { x: 450, y: 350 },
+      { x: 750, y: 350 },
+      { x: 600, y: 200 }
+    ]
+  },
+  final_destination: {
+    id: 'final_destination',
+    name: 'Final Destination (終点)',
+    width: 1200,
+    height: 800,
+    mainPlatform: { x1: 250, x2: 950, y1: 500, y2: 530 },
+    platforms: [],
+    blastZones: { left: -200, right: 1400, top: -300, bottom: 1000 },
+    spawnPoints: [
+      { x: 400, y: 450 },
+      { x: 800, y: 450 },
+      { x: 600, y: 450 }
+    ]
+  },
+  dream_land: {
+    id: 'dream_land',
+    name: 'Dream Land (プププランド)',
+    width: 1200,
+    height: 800,
+    mainPlatform: { x1: 320, x2: 880, y1: 500, y2: 530 },
+    platforms: [
+      { x1: 320, x2: 520, y: 370 },
+      { x1: 680, x2: 880, y: 370 },
+      { x1: 500, x2: 700, y: 240 }
+    ],
+    blastZones: { left: -250, right: 1450, top: -350, bottom: 1050 },
+    spawnPoints: [
+      { x: 450, y: 330 },
+      { x: 750, y: 330 },
+      { x: 600, y: 180 }
+    ]
   }
 };
 
-const SPAWN_POINTS = [
-  { x: 450, y: 350 },
-  { x: 750, y: 350 },
-  { x: 600, y: 200 }
-];
+let currentStageId = 'battlefield';
+let STAGE = STAGES[currentStageId];
 
 const COLORS = [
   '#3b82f6', // P1: Vibrant Blue
@@ -61,7 +94,8 @@ let nextProjId = 0;         // ID index for projectiles
 
 // Helper to get a random spawn point
 function getRandomSpawnPoint() {
-  return SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
+  const points = STAGE.spawnPoints;
+  return points[Math.floor(Math.random() * points.length)];
 }
 
 // Player initialization
@@ -136,6 +170,25 @@ wss.on('connection', (ws) => {
       const data = JSON.parse(message);
 
       if (data.type === 'join') {
+        // If this is the FIRST active player joining, update stage to their selection
+        const activeCount = Object.keys(players).filter(id => !players[id].isEliminated).length;
+        if (activeCount === 0 && data.stageId && STAGES[data.stageId]) {
+          currentStageId = data.stageId;
+          STAGE = STAGES[currentStageId];
+          console.log(`Setting stage to: ${STAGE.name}`);
+          
+          // Broadcast stage update to all connected clients
+          const stageChangePacket = JSON.stringify({
+            type: 'stage_change',
+            stage: STAGE
+          });
+          wss.clients.forEach(client => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(stageChangePacket);
+            }
+          });
+        }
+
         // Player joins the arena
         players[playerId] = createPlayer(playerId, data.name);
         events.push({

@@ -439,6 +439,9 @@ ws.onmessage = (message) => {
       myPlayerId = data.id;
       stageConfig = data.stage;
       console.log('Registered ID:', myPlayerId);
+    } else if (data.type === 'stage_change') {
+      stageConfig = data.stage;
+      console.log('Stage changed dynamically to:', stageConfig.name);
     } else if (data.type === 'state') {
       currentGameState = data;
       
@@ -591,13 +594,18 @@ joinForm.addEventListener('submit', () => {
     // Save nickname to browser local storage for future visits
     localStorage.setItem('pict_fight_nickname', nickname);
 
+    // Get selected stage ID
+    const selectedStageInput = document.querySelector('input[name="stage_select"]:checked');
+    const stageId = selectedStageInput ? selectedStageInput.value : 'battlefield';
+
     // 1. Initialize audio Context (requires user interaction gesture)
     initAudio();
     
     // 2. Send join packet
     ws.send(JSON.stringify({
       type: 'join',
-      name: nickname
+      name: nickname,
+      stageId: stageId
     }));
 
     // 3. Switch layout Panels

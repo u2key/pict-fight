@@ -39,6 +39,36 @@
             <input type="text" id="nickname-input" placeholder="Player Nickname" minlength="2" maxlength="12" required autocomplete="off">
             <span class="focus-border"></span>
           </div>
+
+          <!-- Stage Selection Grid -->
+          <div class="stage-selector-section">
+            <h3>Select Arena Stage</h3>
+            <div class="stage-grid">
+              <label class="stage-card">
+                <input type="radio" name="stage_select" value="battlefield" checked>
+                <div class="stage-card-content">
+                  <img src="images/battlefield.png" alt="Battlefield">
+                  <span class="stage-name">Battlefield (戦場)</span>
+                </div>
+              </label>
+              
+              <label class="stage-card">
+                <input type="radio" name="stage_select" value="final_destination">
+                <div class="stage-card-content">
+                  <img src="images/final_destination.png" alt="Final Destination">
+                  <span class="stage-name">Final Destination (終点)</span>
+                </div>
+              </label>
+
+              <label class="stage-card">
+                <input type="radio" name="stage_select" value="dream_land">
+                <div class="stage-card-content">
+                  <img src="images/dream_land.png" alt="Dream Land">
+                  <span class="stage-name">Dream Land (プププ)</span>
+                </div>
+              </label>
+            </div>
+          </div>
           
           <button type="submit" id="btn-join" class="btn btn-primary">Join Match</button>
         </form>
