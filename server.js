@@ -858,7 +858,7 @@ function resolveCollisions(p, inputs) {
         const slope = Math.abs(Math.sin(plat.angle));
         if (slope > 0.707) continue;
 
-        if (p.x >= minX - 10 && p.x <= maxX + 10) {
+        if (p.x >= minX - 15 && p.x <= maxX + 15) {
           const dx = plat.x2 - plat.x1;
           const dy = plat.y2 - plat.y1;
           let platY = plat.y;
@@ -868,7 +868,7 @@ function resolveCollisions(p, inputs) {
 
           const py2 = p.y;
           const prev_py2 = p.prevY;
-          if ((prev_py2 <= platY + 5 && py2 >= platY - 5) || (Math.abs(p.y - platY) < 12 && p.vy >= 0)) {
+          if ((prev_py2 <= platY + 10 && py2 >= platY - 10) || (Math.abs(p.y - platY) < 16 && p.vy >= 0)) {
             p.y = platY;
             p.vy = 0;
             p.grounded = true;
@@ -883,8 +883,8 @@ function resolveCollisions(p, inputs) {
         const py2 = p.y;
         const prev_py2 = p.prevY;
 
-        if (prev_py2 <= plat.y && py2 >= plat.y) {
-          if (px1 < plat.x2 && px2 > plat.x1) {
+        if ((prev_py2 <= plat.y + 10 && py2 >= plat.y - 10) || (Math.abs(p.y - plat.y) < 16 && p.vy >= 0)) {
+          if (px1 < plat.x2 + 10 && px2 > plat.x1 - 10) {
             p.y = plat.y;
             p.vy = 0;
             p.grounded = true;
