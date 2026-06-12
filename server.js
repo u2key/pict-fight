@@ -22,9 +22,9 @@ const STAGES = {
     height: 800,
     mainPlatform: { x1: 300, x2: 900, y1: 500, y2: 530 },
     platforms: [
-      { x1: 350, x2: 550, y: 390 },
-      { x1: 650, x2: 850, y: 390 },
-      { x1: 500, x2: 700, y: 280 }
+      { id: 'plat_bf1', x1: 350, x2: 550, y: 390, isRotating: false },
+      { id: 'plat_bf2', x1: 650, x2: 850, y: 390, isRotating: false },
+      { id: 'plat_bf3', x1: 500, x2: 700, y: 280, isRotating: false }
     ],
     blastZones: { left: -200, right: 1400, top: -300, bottom: 1000 },
     spawnPoints: [
@@ -54,15 +54,32 @@ const STAGES = {
     height: 800,
     mainPlatform: { x1: 320, x2: 880, y1: 500, y2: 530 },
     platforms: [
-      { x1: 320, x2: 520, y: 370 },
-      { x1: 680, x2: 880, y: 370 },
-      { x1: 500, x2: 700, y: 240 }
+      { id: 'plat_dl1', x1: 320, x2: 520, y: 370, isRotating: false },
+      { id: 'plat_dl2', x1: 680, x2: 880, y: 370, isRotating: false },
+      { id: 'plat_dl3', x1: 500, x2: 700, y: 240, isRotating: false }
     ],
     blastZones: { left: -250, right: 1450, top: -350, bottom: 1050 },
     spawnPoints: [
       { x: 450, y: 330 },
       { x: 750, y: 330 },
       { x: 600, y: 180 }
+    ]
+  },
+  rotating_ruins: {
+    id: 'rotating_ruins',
+    name: 'Rotating Ruins (回転遺跡)',
+    width: 1200,
+    height: 800,
+    mainPlatform: { x1: 300, x2: 900, y1: 500, y2: 530 },
+    platforms: [
+      { id: 'plat_rot1', x: 420, y: 350, length: 180, angle: 0, angularSpeed: 0.012, isRotating: true, rotateOnTouch: false, x1: 330, y1: 350, x2: 510, y2: 350 },
+      { id: 'plat_rot2', x: 780, y: 350, length: 180, angle: 0, angularSpeed: 0.02, isRotating: true, rotateOnTouch: true, x1: 690, y1: 350, x2: 870, y2: 350 }
+    ],
+    blastZones: { left: -200, right: 1400, top: -300, bottom: 1000 },
+    spawnPoints: [
+      { x: 450, y: 300 },
+      { x: 750, y: 300 },
+      { x: 600, y: 200 }
     ]
   }
 };
@@ -98,6 +115,41 @@ function getRandomSpawnPoint() {
   return points[Math.floor(Math.random() * points.length)];
 }
 
+// Update stage platforms (angle and endpoints for rotating ones)
+function updateStagePlatforms() {
+  if (!STAGE || !STAGE.platforms) return;
+  
+  STAGE.platforms.forEach(plat => {
+    if (plat.isRotating) {
+      let shouldRotate = !plat.rotateOnTouch;
+      
+      // If rotateOnTouch is true, check if any player is standing on it
+      if (plat.rotateOnTouch) {
+        for (const id in players) {
+          const p = players[id];
+          if (p.grounded && p.standingOnPlatId === plat.id) {
+            shouldRotate = true;
+            break;
+          }
+        }
+      }
+      
+      if (shouldRotate) {
+        plat.angle += plat.angularSpeed;
+        if (plat.angle > Math.PI * 2) plat.angle -= Math.PI * 2;
+      }
+      
+      // Update endpoints based on center and angle
+      const cos = Math.cos(plat.angle);
+      const sin = Math.sin(plat.angle);
+      plat.x1 = plat.x - cos * (plat.length / 2);
+      plat.y1 = plat.y - sin * (plat.length / 2);
+      plat.x2 = plat.x + cos * (plat.length / 2);
+      plat.y2 = plat.y + sin * (plat.length / 2);
+    }
+  });
+}
+
 // Player initialization
 function createPlayer(id, name) {
   const spawn = getRandomSpawnPoint();
@@ -121,6 +173,7 @@ function createPlayer(id, name) {
     height: isStriker ? 69 : 55,
     facing: 1, // 1 for right, -1 for left
     grounded: false,
+    standingOnPlatId: null, // Track which rotating platform the player stands on
     jumpCount: 0,
     damageRate: 0, // Starts at 0.0%
     stocks: 3,
@@ -271,6 +324,42 @@ function updatePlayer(id) {
   // Invulnerability timer
   if (p.invulnerableTimer > 0) {
     p.invulnerableTimer--;
+  }
+
+  // Carry player with rotating platform
+  if (p.grounded && p.standingOnPlatId) {
+    const plat = STAGE.platforms.find(pl => pl.id === p.standingOnPlatId);
+    if (plat && plat.isRotating) {
+      const dTheta = plat.angularSpeed;
+      
+      let didRotate = !plat.rotateOnTouch;
+      if (plat.rotateOnTouch) {
+        didRotate = true;
+      }
+      
+      if (didRotate) {
+        // Translate player relative to platform center
+        const rx = p.x - plat.x;
+        const ry = p.y - plat.y;
+        
+        // Rotate coordinates by dTheta
+        const cos = Math.cos(dTheta);
+        const sin = Math.sin(dTheta);
+        const nx = rx * cos - ry * sin;
+        const ny = rx * sin + ry * cos;
+        
+        // Apply new position
+        p.x = plat.x + nx;
+        p.y = plat.y + ny;
+      }
+      
+      // Slide off check: if slope is too steep, slide off
+      const slope = Math.abs(Math.sin(plat.angle));
+      if (slope > 0.707) { // > 45 degrees
+        p.grounded = false;
+        p.standingOnPlatId = null;
+      }
+    }
   }
 
   // Save current position as previous before applying movement
@@ -707,19 +796,48 @@ function resolveCollisions(p, inputs) {
   const canDrop = inputs.down && p.hitStun === 0 && p.shieldStun === 0;
   if (p.vy >= 0 && !canDrop) {
     for (const plat of STAGE.platforms) {
-      const px1 = p.x - p.width / 2;
-      const px2 = p.x + p.width / 2;
-      const py2 = p.y;
-      const prev_py2 = p.prevY;
+      if (plat.isRotating) {
+        const minX = Math.min(plat.x1, plat.x2);
+        const maxX = Math.max(plat.x1, plat.x2);
+        
+        // Slope limit
+        const slope = Math.abs(Math.sin(plat.angle));
+        if (slope > 0.707) continue;
 
-      // Check if crossing from above to below
-      if (prev_py2 <= plat.y && py2 >= plat.y) {
-        if (px1 < plat.x2 && px2 > plat.x1) {
-          p.y = plat.y;
-          p.vy = 0;
-          p.grounded = true;
-          p.jumpCount = 0;
-          break; // Stop checking other platforms
+        if (p.x >= minX - 10 && p.x <= maxX + 10) {
+          const dx = plat.x2 - plat.x1;
+          const dy = plat.y2 - plat.y1;
+          let platY = plat.y;
+          if (Math.abs(dx) > 0.1) {
+            platY = plat.y1 + (p.x - plat.x1) * (dy / dx);
+          }
+
+          const py2 = p.y;
+          const prev_py2 = p.prevY;
+          if ((prev_py2 <= platY + 5 && py2 >= platY - 5) || (Math.abs(p.y - platY) < 12 && p.vy >= 0)) {
+            p.y = platY;
+            p.vy = 0;
+            p.grounded = true;
+            p.jumpCount = 0;
+            p.standingOnPlatId = plat.id;
+            break;
+          }
+        }
+      } else {
+        const px1 = p.x - p.width / 2;
+        const px2 = p.x + p.width / 2;
+        const py2 = p.y;
+        const prev_py2 = p.prevY;
+
+        if (prev_py2 <= plat.y && py2 >= plat.y) {
+          if (px1 < plat.x2 && px2 > plat.x1) {
+            p.y = plat.y;
+            p.vy = 0;
+            p.grounded = true;
+            p.jumpCount = 0;
+            p.standingOnPlatId = null;
+            break;
+          }
         }
       }
     }
@@ -834,6 +952,7 @@ function restartMatch() {
     p.respawnTimer = 0;
     p.invulnerableTimer = 120;
     p.grounded = false;
+    p.standingOnPlatId = null;
     p.jumpCount = 0;
     p.isAttacking = false;
     p.isCharging = false;
@@ -974,6 +1093,9 @@ function gameLoop() {
         restartMatch();
       }
     }
+
+    // Update stage platforms (rotating ruins stages, etc.)
+    updateStagePlatforms();
 
     // 2. Update all players
     for (const id in players) {

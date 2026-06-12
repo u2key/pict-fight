@@ -1114,8 +1114,8 @@ function render() {
       ctx.lineWidth = 4;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(plat.x1, plat.y);
-      ctx.lineTo(plat.x2, plat.y);
+      ctx.moveTo(plat.x1, plat.y1 !== undefined ? plat.y1 : plat.y);
+      ctx.lineTo(plat.x2, plat.y2 !== undefined ? plat.y2 : plat.y);
       ctx.stroke();
       ctx.restore();
     });
